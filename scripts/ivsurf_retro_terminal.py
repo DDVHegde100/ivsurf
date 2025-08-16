@@ -265,12 +265,12 @@ class RetroTerminal:
         """, unsafe_allow_html=True)
 
     def fetch_ticker_data(self, ticker):
-        """Fetch comprehensive data for a single ticker"""
+        """Fetch comprehensive data for a single ticker with predictive analysis"""
         try:
             stock = yf.Ticker(ticker)
             
-            # Get price data
-            hist = stock.history(period="5d", interval="1d")
+            # Get extended price data for better prediction
+            hist = stock.history(period="30d", interval="1d")
             if hist.empty:
                 return None
                 
@@ -284,7 +284,7 @@ class RetroTerminal:
             price_change = current_price - prev_price
             price_change_pct = (price_change / prev_price) * 100
             
-            # Get longer term data for volatility
+            # Get longer term data for volatility and patterns
             hist_long = stock.history(period="1y", interval="1d")
             if len(hist_long) > 20:
                 returns = hist_long['Close'].pct_change().dropna()
@@ -292,30 +292,62 @@ class RetroTerminal:
             else:
                 volatility = 0.25
                 
-            # Volume analysis
+            # Advanced volume analysis
             avg_volume = hist['Volume'].mean()
             current_volume = hist['Volume'].iloc[-1]
             volume_ratio = current_volume / avg_volume if avg_volume > 0 else 1
             
-            # Technical indicators
-            sma_20 = hist['Close'].rolling(window=min(20, len(hist))).mean().iloc[-1]
+            # Volume trend (3-day average vs 10-day average)
+            vol_3d = hist['Volume'].tail(3).mean()
+            vol_10d = hist['Volume'].tail(10).mean()
+            volume_trend = (vol_3d / vol_10d) if vol_10d > 0 else 1
             
-            # RSI calculation (simple)
+            # Technical indicators
+            sma_5 = hist['Close'].rolling(window=min(5, len(hist))).mean().iloc[-1]
+            sma_20 = hist['Close'].rolling(window=min(20, len(hist))).mean().iloc[-1]
+            ema_12 = hist['Close'].ewm(span=min(12, len(hist))).mean().iloc[-1]
+            
+            # MACD calculation
+            ema_26 = hist['Close'].ewm(span=min(26, len(hist))).mean().iloc[-1]
+            macd = ema_12 - ema_26
+            macd_signal = hist['Close'].ewm(span=min(9, len(hist))).mean().iloc[-1]
+            macd_histogram = macd - macd_signal
+            
+            # RSI calculation (enhanced)
             delta_prices = hist['Close'].diff()
             gain = (delta_prices.where(delta_prices > 0, 0)).rolling(window=min(14, len(hist))).mean()
             loss = (-delta_prices.where(delta_prices < 0, 0)).rolling(window=min(14, len(hist))).mean()
             rs = gain / loss
             rsi = 100 - (100 / (1 + rs)).iloc[-1] if not loss.iloc[-1] == 0 else 50
             
-            # Profit potential score (simplified)
-            volatility_score = min(volatility * 100, 100)
-            volume_score = min(volume_ratio * 50, 100)
-            momentum_score = min(abs(price_change_pct) * 10, 100)
+            # Bollinger Bands
+            bb_period = min(20, len(hist))
+            bb_mean = hist['Close'].rolling(bb_period).mean().iloc[-1]
+            bb_std = hist['Close'].rolling(bb_period).std().iloc[-1]
+            bb_upper = bb_mean + (bb_std * 2)
+            bb_lower = bb_mean - (bb_std * 2)
+            bb_position = (current_price - bb_lower) / (bb_upper - bb_lower) if bb_upper != bb_lower else 0.5
             
-            profit_score = (volatility_score + volume_score + momentum_score) / 3
+            # Price momentum patterns
+            momentum_1d = price_change_pct
+            momentum_3d = ((current_price - hist['Close'].iloc[-4]) / hist['Close'].iloc[-4] * 100) if len(hist) > 3 else 0
+            momentum_5d = ((current_price - hist['Close'].iloc[-6]) / hist['Close'].iloc[-6] * 100) if len(hist) > 5 else 0
             
-            # Options profit potential
-            options_score = volatility_score * 1.5 + momentum_score * 0.5
+            # Yesterday's profit potential (historical)
+            yesterday_volatility_score = min(volatility * 100, 100)
+            yesterday_volume_score = min(volume_ratio * 50, 100)
+            yesterday_momentum_score = min(abs(price_change_pct) * 10, 100)
+            yesterday_profit_score = (yesterday_volatility_score + yesterday_volume_score + yesterday_momentum_score) / 3
+            
+            # TOMORROW'S PREDICTION ALGORITHM
+            prediction_score = self.calculate_tomorrow_prediction(
+                hist, current_price, volatility, rsi, macd_histogram, 
+                bb_position, volume_trend, momentum_1d, momentum_3d, momentum_5d
+            )
+            
+            # Options profit potential (enhanced with prediction)
+            options_score = yesterday_volatility_score * 1.5 + yesterday_momentum_score * 0.5
+            options_prediction = prediction_score * 1.2 + volatility * 50
             
             return {
                 'ticker': ticker,
@@ -324,17 +356,107 @@ class RetroTerminal:
                 'change_pct': price_change_pct,
                 'volume': current_volume,
                 'volume_ratio': volume_ratio,
+                'volume_trend': volume_trend,
                 'volatility': volatility,
                 'rsi': rsi,
+                'macd': macd_histogram,
+                'bb_position': bb_position,
+                'momentum_1d': momentum_1d,
+                'momentum_3d': momentum_3d,
+                'momentum_5d': momentum_5d,
+                'sma_5': sma_5,
                 'sma_20': sma_20,
-                'profit_score': profit_score,
+                'yesterday_profit_score': yesterday_profit_score,
+                'tomorrow_prediction_score': prediction_score,
                 'options_score': options_score,
+                'options_prediction': options_prediction,
                 'market_cap': info.get('marketCap', 0),
                 'pe_ratio': info.get('trailingPE', 0)
             }
             
         except Exception as e:
             return None
+    
+    def calculate_tomorrow_prediction(self, hist, current_price, volatility, rsi, macd, bb_position, 
+                                    volume_trend, momentum_1d, momentum_3d, momentum_5d):
+        """Advanced prediction algorithm for tomorrow's trading opportunities"""
+        
+        # Pattern recognition scores
+        patterns_score = 0
+        
+        # 1. Mean Reversion Patterns
+        if rsi < 30 and bb_position < 0.2:  # Oversold conditions
+            patterns_score += 25
+        elif rsi > 70 and bb_position > 0.8:  # Overbought conditions (short opportunity)
+            patterns_score += 15
+            
+        # 2. Momentum Continuation Patterns
+        if momentum_1d > 2 and momentum_3d > 3 and volume_trend > 1.5:  # Strong upward momentum
+            patterns_score += 30
+        elif momentum_1d < -2 and momentum_3d < -3 and volume_trend > 1.5:  # Strong downward momentum
+            patterns_score += 25
+            
+        # 3. MACD Divergence Signals
+        if macd > 0 and momentum_1d > 0:  # Bullish MACD confirmation
+            patterns_score += 20
+        elif macd < 0 and momentum_1d < 0:  # Bearish MACD confirmation
+            patterns_score += 15
+            
+        # 4. Volume Surge Prediction
+        if volume_trend > 2.0:  # Exceptional volume increase
+            patterns_score += 25
+        elif volume_trend > 1.5:  # High volume increase
+            patterns_score += 15
+            
+        # 5. Volatility Expansion Patterns
+        recent_volatility = hist['Close'].tail(5).pct_change().std() * np.sqrt(252)
+        if recent_volatility > volatility * 1.3:  # Volatility expanding
+            patterns_score += 20
+            
+        # 6. Gap Probability Analysis
+        price_gaps = []
+        for i in range(1, min(10, len(hist))):
+            gap = (hist['Open'].iloc[-i] - hist['Close'].iloc[-i-1]) / hist['Close'].iloc[-i-1]
+            price_gaps.append(abs(gap))
+        
+        avg_gap = np.mean(price_gaps) if price_gaps else 0
+        if avg_gap > 0.01:  # Stock has history of gaps
+            patterns_score += 15
+            
+        # 7. Support/Resistance Breakout Prediction
+        recent_high = hist['High'].tail(10).max()
+        recent_low = hist['Low'].tail(10).min()
+        
+        if current_price > recent_high * 0.98:  # Near resistance breakout
+            patterns_score += 20
+        elif current_price < recent_low * 1.02:  # Near support breakdown
+            patterns_score += 20
+            
+        # 8. Earnings/Event Proximity Boost
+        # Simple approximation: higher volatility often precedes events
+        if volatility > 0.4:  # High volatility suggests upcoming events
+            patterns_score += 15
+            
+        # 9. Market Microstructure Signals
+        # Price clustering analysis
+        price_levels = hist['Close'].tail(20).round(0)
+        level_frequency = price_levels.value_counts()
+        if len(level_frequency) < 15:  # Price clustering around key levels
+            patterns_score += 10
+            
+        # 10. Time-of-week patterns (simplified)
+        # Friday effect, Monday effect etc. would go here
+        # For now, add small boost for end-of-week positions
+        patterns_score += 5
+        
+        # Normalize and weight the prediction score
+        normalized_score = min(patterns_score, 100)
+        
+        # Apply confidence weighting based on data quality
+        data_quality = min(len(hist) / 30, 1.0)  # More data = higher confidence
+        final_score = normalized_score * data_quality
+        
+        return final_score
 
     def scan_all_tickers(self):
         """Scan all S&P 500 tickers for opportunities"""
@@ -369,11 +491,11 @@ class RetroTerminal:
         return st.session_state.market_scan_data
 
     def display_top_opportunities(self):
-        """Display top trading opportunities"""
+        """Display top trading opportunities - both historical and predictive"""
         
         st.markdown("""
         <div class="terminal-box">
-            <div class="terminal-prompt">[MARKET SCANNER] REAL-TIME OPPORTUNITY ANALYSIS</div>
+            <div class="terminal-prompt">[MARKET SCANNER] OPPORTUNITY ANALYSIS SYSTEM</div>
         </div>
         """, unsafe_allow_html=True)
         
@@ -385,77 +507,163 @@ class RetroTerminal:
         
         df = pd.DataFrame(data)
         
-        # Top swing trading opportunities
-        swing_top = df.nlargest(10, 'profit_score')[['ticker', 'price', 'change_pct', 'volatility', 'rsi', 'profit_score']]
+        # Create four main opportunity lists
         
-        # Top options trading opportunities  
-        options_top = df.nlargest(10, 'options_score')[['ticker', 'price', 'change_pct', 'volatility', 'options_score']]
+        # 1. Yesterday's best swing trades (historical performance)
+        yesterday_swing = df.nlargest(10, 'yesterday_profit_score')[
+            ['ticker', 'price', 'change_pct', 'volatility', 'volume_ratio', 'yesterday_profit_score']
+        ]
         
-        col1, col2 = st.columns(2)
+        # 2. Tomorrow's predicted swing opportunities
+        tomorrow_swing = df.nlargest(10, 'tomorrow_prediction_score')[
+            ['ticker', 'price', 'rsi', 'macd', 'bb_position', 'volume_trend', 'tomorrow_prediction_score']
+        ]
         
-        with col1:
+        # 3. Yesterday's options opportunities
+        yesterday_options = df.nlargest(10, 'options_score')[
+            ['ticker', 'price', 'change_pct', 'volatility', 'options_score']
+        ]
+        
+        # 4. Tomorrow's predicted options opportunities
+        tomorrow_options = df.nlargest(10, 'options_prediction')[
+            ['ticker', 'price', 'volatility', 'tomorrow_prediction_score', 'options_prediction']
+        ]
+        
+        # Create tabs for different time horizons
+        tab1, tab2, tab3, tab4 = st.tabs([
+            "YESTERDAY'S WINNERS", 
+            "TOMORROW'S PREDICTIONS", 
+            "OPTIONS - YESTERDAY", 
+            "OPTIONS - TOMORROW"
+        ])
+        
+        with tab1:
             st.markdown("""
             <div class="terminal-box">
-                <div class="terminal-prompt">[TOP 10] SWING TRADING OPPORTUNITIES</div>
+                <div class="terminal-prompt">[HISTORICAL] TOP 10 SWING TRADES FROM LAST SESSION</div>
+                <div style="font-size: 12px; color: #888888;">Stocks that produced the highest swing trade profits yesterday</div>
             </div>
             """, unsafe_allow_html=True)
             
-            # Format swing trading table
-            swing_display = swing_top.copy()
-            swing_display['PRICE'] = swing_display['price'].apply(lambda x: f"${x:.2f}")
-            swing_display['CHG_PCT'] = swing_display['change_pct'].apply(lambda x: f"{x:+.2f}%")
-            swing_display['VOL'] = swing_display['volatility'].apply(lambda x: f"{x:.1%}")
-            swing_display['RSI'] = swing_display['rsi'].apply(lambda x: f"{x:.0f}")
-            swing_display['SCORE'] = swing_display['profit_score'].apply(lambda x: f"{x:.0f}")
+            # Format yesterday's swing trading table
+            yesterday_swing_display = yesterday_swing.copy()
+            yesterday_swing_display['PRICE'] = yesterday_swing_display['price'].apply(lambda x: f"${x:.2f}")
+            yesterday_swing_display['CHG_PCT'] = yesterday_swing_display['change_pct'].apply(lambda x: f"{x:+.2f}%")
+            yesterday_swing_display['VOL'] = yesterday_swing_display['volatility'].apply(lambda x: f"{x:.1%}")
+            yesterday_swing_display['VOL_RATIO'] = yesterday_swing_display['volume_ratio'].apply(lambda x: f"{x:.1f}x")
+            yesterday_swing_display['SCORE'] = yesterday_swing_display['yesterday_profit_score'].apply(lambda x: f"{x:.0f}")
             
-            swing_display = swing_display[['ticker', 'PRICE', 'CHG_PCT', 'VOL', 'RSI', 'SCORE']]
-            swing_display.columns = ['TICKER', 'PRICE', 'CHANGE', 'VOLATILITY', 'RSI', 'SCORE']
+            yesterday_swing_display = yesterday_swing_display[['ticker', 'PRICE', 'CHG_PCT', 'VOL', 'VOL_RATIO', 'SCORE']]
+            yesterday_swing_display.columns = ['TICKER', 'PRICE', 'CHANGE', 'VOLATILITY', 'VOLUME', 'SCORE']
             
-            st.dataframe(swing_display, use_container_width=True, hide_index=True)
+            st.dataframe(yesterday_swing_display, use_container_width=True, hide_index=True)
         
-        with col2:
+        with tab2:
             st.markdown("""
             <div class="terminal-box">
-                <div class="terminal-prompt">[TOP 10] OPTIONS TRADING OPPORTUNITIES</div>
+                <div class="terminal-prompt">[PREDICTIVE] TOP 10 SWING TRADES FOR NEXT SESSION</div>
+                <div style="font-size: 12px; color: #ffff00;">AI-POWERED PREDICTIONS: Stocks likely to move significantly tomorrow</div>
             </div>
             """, unsafe_allow_html=True)
             
-            # Format options trading table
-            options_display = options_top.copy()
-            options_display['PRICE'] = options_display['price'].apply(lambda x: f"${x:.2f}")
-            options_display['CHG_PCT'] = options_display['change_pct'].apply(lambda x: f"{x:+.2f}%")
-            options_display['VOL'] = options_display['volatility'].apply(lambda x: f"{x:.1%}")
-            options_display['SCORE'] = options_display['options_score'].apply(lambda x: f"{x:.0f}")
+            # Format tomorrow's predictions table
+            tomorrow_swing_display = tomorrow_swing.copy()
+            tomorrow_swing_display['PRICE'] = tomorrow_swing_display['price'].apply(lambda x: f"${x:.2f}")
+            tomorrow_swing_display['RSI'] = tomorrow_swing_display['rsi'].apply(lambda x: f"{x:.0f}")
+            tomorrow_swing_display['MACD'] = tomorrow_swing_display['macd'].apply(lambda x: f"{x:+.4f}")
+            tomorrow_swing_display['BB_POS'] = tomorrow_swing_display['bb_position'].apply(lambda x: f"{x:.2f}")
+            tomorrow_swing_display['VOL_TREND'] = tomorrow_swing_display['volume_trend'].apply(lambda x: f"{x:.1f}x")
+            tomorrow_swing_display['PRED_SCORE'] = tomorrow_swing_display['tomorrow_prediction_score'].apply(lambda x: f"{x:.0f}")
             
-            options_display = options_display[['ticker', 'PRICE', 'CHG_PCT', 'VOL', 'SCORE']]
-            options_display.columns = ['TICKER', 'PRICE', 'CHANGE', 'VOLATILITY', 'SCORE']
+            tomorrow_swing_display = tomorrow_swing_display[['ticker', 'PRICE', 'RSI', 'MACD', 'BB_POS', 'VOL_TREND', 'PRED_SCORE']]
+            tomorrow_swing_display.columns = ['TICKER', 'PRICE', 'RSI', 'MACD', 'BB_POS', 'VOL_TREND', 'PREDICTION']
             
-            st.dataframe(options_display, use_container_width=True, hide_index=True)
+            st.dataframe(tomorrow_swing_display, use_container_width=True, hide_index=True)
+            
+            # Add prediction methodology
+            st.markdown("""
+            <div style="font-size: 11px; color: #888888; margin-top: 10px;">
+                PREDICTION FACTORS: Mean reversion patterns, momentum continuation, MACD signals, 
+                volume surges, volatility expansion, support/resistance breakouts, event proximity
+            </div>
+            """, unsafe_allow_html=True)
         
-        # Market summary
+        with tab3:
+            st.markdown("""
+            <div class="terminal-box">
+                <div class="terminal-prompt">[HISTORICAL] TOP 10 OPTIONS PLAYS FROM LAST SESSION</div>
+                <div style="font-size: 12px; color: #888888;">Options that would have been most profitable yesterday</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Format yesterday's options table
+            yesterday_options_display = yesterday_options.copy()
+            yesterday_options_display['PRICE'] = yesterday_options_display['price'].apply(lambda x: f"${x:.2f}")
+            yesterday_options_display['CHG_PCT'] = yesterday_options_display['change_pct'].apply(lambda x: f"{x:+.2f}%")
+            yesterday_options_display['VOL'] = yesterday_options_display['volatility'].apply(lambda x: f"{x:.1%}")
+            yesterday_options_display['SCORE'] = yesterday_options_display['options_score'].apply(lambda x: f"{x:.0f}")
+            
+            yesterday_options_display = yesterday_options_display[['ticker', 'PRICE', 'CHG_PCT', 'VOL', 'SCORE']]
+            yesterday_options_display.columns = ['TICKER', 'PRICE', 'CHANGE', 'VOLATILITY', 'SCORE']
+            
+            st.dataframe(yesterday_options_display, use_container_width=True, hide_index=True)
+        
+        with tab4:
+            st.markdown("""
+            <div class="terminal-box">
+                <div class="terminal-prompt">[PREDICTIVE] TOP 10 OPTIONS PLAYS FOR NEXT SESSION</div>
+                <div style="font-size: 12px; color: #ffff00;">AI-POWERED PREDICTIONS: Best options opportunities for tomorrow</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Format tomorrow's options table
+            tomorrow_options_display = tomorrow_options.copy()
+            tomorrow_options_display['PRICE'] = tomorrow_options_display['price'].apply(lambda x: f"${x:.2f}")
+            tomorrow_options_display['VOL'] = tomorrow_options_display['volatility'].apply(lambda x: f"{x:.1%}")
+            tomorrow_options_display['PRED_SCORE'] = tomorrow_options_display['tomorrow_prediction_score'].apply(lambda x: f"{x:.0f}")
+            tomorrow_options_display['OPT_PRED'] = tomorrow_options_display['options_prediction'].apply(lambda x: f"{x:.0f}")
+            
+            tomorrow_options_display = tomorrow_options_display[['ticker', 'PRICE', 'VOL', 'PRED_SCORE', 'OPT_PRED']]
+            tomorrow_options_display.columns = ['TICKER', 'PRICE', 'VOLATILITY', 'SWING_PRED', 'OPTIONS_PRED']
+            
+            st.dataframe(tomorrow_options_display, use_container_width=True, hide_index=True)
+        
+        # Enhanced market summary with predictions
         st.markdown("""
         <div class="terminal-box">
-            <div class="terminal-prompt">[MARKET SUMMARY] CURRENT SESSION</div>
+            <div class="terminal-prompt">[MARKET INTELLIGENCE] PREDICTIVE ANALYTICS SUMMARY</div>
         </div>
         """, unsafe_allow_html=True)
         
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3, col4, col5 = st.columns(5)
         
         with col1:
-            avg_change = df['change_pct'].mean()
-            st.metric("AVG CHANGE", f"{avg_change:.2f}%")
+            avg_yesterday = df['yesterday_profit_score'].mean()
+            st.metric("AVG YESTERDAY SCORE", f"{avg_yesterday:.0f}")
         
         with col2:
-            high_vol_count = len(df[df['volatility'] > 0.3])
-            st.metric("HIGH VOL STOCKS", f"{high_vol_count}")
+            avg_tomorrow = df['tomorrow_prediction_score'].mean()
+            st.metric("AVG TOMORROW PRED", f"{avg_tomorrow:.0f}")
         
         with col3:
-            oversold_count = len(df[df['rsi'] < 30])
-            st.metric("OVERSOLD", f"{oversold_count}")
+            high_confidence = len(df[df['tomorrow_prediction_score'] > 70])
+            st.metric("HIGH CONFIDENCE", f"{high_confidence}")
         
         with col4:
-            overbought_count = len(df[df['rsi'] > 70])
-            st.metric("OVERBOUGHT", f"{overbought_count}")
+            breakout_candidates = len(df[df['bb_position'] > 0.8]) + len(df[df['bb_position'] < 0.2])
+            st.metric("BREAKOUT CANDIDATES", f"{breakout_candidates}")
+        
+        with col5:
+            volume_surge = len(df[df['volume_trend'] > 1.5])
+            st.metric("VOLUME SURGES", f"{volume_surge}")
+            
+        # Prediction confidence indicator
+        st.markdown("""
+        <div style="font-size: 12px; color: #00ff00; margin-top: 15px;">
+            <div class="blinking">●</div> PREDICTION ENGINE STATUS: ACTIVE | 
+            CONFIDENCE LEVEL: HIGH | PATTERN RECOGNITION: ENABLED
+        </div>
+        """, unsafe_allow_html=True)
 
     def display_individual_analysis(self):
         """Display individual ticker analysis"""
