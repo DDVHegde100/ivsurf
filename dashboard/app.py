@@ -4,6 +4,12 @@ import yfinance as yf
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
+import sys
+import os
+
+# Add project root to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from utils.fetch_data import get_options_chain
 from core.black_scholes import black_scholes_price, implied_volatility, option_value_decomposition
 from core.greeks import all_greeks
