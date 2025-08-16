@@ -38,13 +38,44 @@ class RetroTerminal:
     """Classic 1996 Investment Banking Terminal"""
     
     def __init__(self):
-        self.sp500_tickers = [
-            'AAPL', 'MSFT', 'AMZN', 'NVDA', 'GOOGL', 'GOOG', 'META', 'TSLA', 'BRK-B', 'UNH',
-            'XOM', 'LLY', 'JPM', 'JNJ', 'V', 'PG', 'MA', 'AVGO', 'HD', 'CVX',
-            'MRK', 'ABBV', 'PEP', 'KO', 'PFE', 'TMO', 'BAC', 'COST', 'ADBE', 'WMT',
-            'CSCO', 'ABT', 'ACN', 'NKE', 'TXN', 'NEE', 'DHR', 'VZ', 'RTX', 'CRM',
-            'ORCL', 'BMY', 'LIN', 'PM', 'AMD', 'T', 'AMGN', 'HON', 'NFLX', 'CMCSA'
+        # Expanded ticker universe - NASDAQ focus for maximum opportunities
+        self.nasdaq_tickers = [
+            # Tech Giants
+            'AAPL', 'MSFT', 'GOOGL', 'GOOG', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX', 'ADBE',
+            # High-Growth Tech
+            'AVGO', 'ORCL', 'CRM', 'INTC', 'AMD', 'QCOM', 'TXN', 'INTU', 'AMAT', 'MU',
+            # Biotech & Healthcare
+            'GILD', 'AMGN', 'VRTX', 'BIIB', 'REGN', 'MRNA', 'BNTX', 'ILMN', 'ALNY', 'SGEN',
+            # Emerging Growth
+            'ROKU', 'ZOOM', 'DOCU', 'OKTA', 'SNOW', 'PLTR', 'RBLX', 'U', 'DDOG', 'CRWD',
+            # Consumer & Retail
+            'COST', 'SBUX', 'LULU', 'NKLA', 'LCID', 'RIVN', 'ABNB', 'UBER', 'LYFT', 'DASH',
+            # Semiconductors
+            'ASML', 'LRCX', 'KLAC', 'MRVL', 'MCHP', 'ADI', 'NXPI', 'SWKS', 'QRVO', 'MPWR',
+            # Cloud & Software
+            'TEAM', 'WDAY', 'NOW', 'VEEV', 'SPLK', 'SHOP', 'SQ', 'PYPL', 'ZM', 'PTON',
+            # Growth Stocks
+            'TTD', 'TWLO', 'PINS', 'SNAP', 'HOOD', 'COIN', 'MELI', 'BABA', 'JD', 'PDD',
+            # High-Volatility Opportunities
+            'SPCE', 'WISH', 'CLOV', 'AMC', 'GME', 'BB', 'NOK', 'SNDL', 'TLRY', 'CGC',
+            # Small-Mid Cap Growth
+            'FVRR', 'UPWK', 'ETSY', 'CHWY', 'TDOC', 'PTON', 'BYND', 'ZI', 'FSLY', 'NET',
+            # Recent IPOs & SPACs
+            'RIVN', 'LCID', 'SOFI', 'OPEN', 'WISH', 'GOEV', 'NKLA', 'HYLN', 'QS', 'RIDE'
         ]
+        
+        # Additional high-volatility NASDAQ stocks for gain opportunities
+        self.high_vol_nasdaq = [
+            'SOXL', 'TQQQ', 'UPRO', 'SPXL', 'TECL', 'WEBL', 'FNGU', 'CURE', 'LABU', 'ARKK',
+            'ARKG', 'ARKF', 'ARKW', 'ICLN', 'CLOU', 'BLOK', 'FINX', 'ROBO', 'MOON', 'UFO'
+        ]
+        
+        # Combine all tickers for maximum coverage
+        self.all_tickers = list(set(self.nasdaq_tickers + self.high_vol_nasdaq))
+        
+        # Cache for avoiding same stocks
+        self.previous_winners = set()
+        self.last_scan_time = 0
         self.market_data_cache = {}
         self.last_update = None
         
@@ -339,20 +370,20 @@ class RetroTerminal:
             yesterday_momentum_score = min(abs(price_change_pct) * 10, 100)
             yesterday_profit_score = (yesterday_volatility_score + yesterday_volume_score + yesterday_momentum_score) / 3
             
-            # TOMORROW'S PREDICTION ALGORITHM
-            prediction_score = self.calculate_tomorrow_prediction(
+            # TOMORROW'S GAIN PREDICTION ALGORITHM
+            gain_prediction_score = self.calculate_tomorrow_gain_prediction(
                 hist, current_price, volatility, rsi, macd_histogram, 
                 bb_position, volume_trend, momentum_1d, momentum_3d, momentum_5d
             )
             
-            # Price predictions with confidence intervals
-            price_predictions = self.calculate_price_predictions(
-                hist, current_price, volatility, prediction_score
+            # Calculate expected gain potential
+            gain_potential = self.calculate_tomorrow_gain_potential(
+                hist, current_price, volatility, gain_prediction_score
             )
             
             # Options profit potential (enhanced with prediction)
             options_score = yesterday_volatility_score * 1.5 + yesterday_momentum_score * 0.5
-            options_prediction = prediction_score * 1.2 + volatility * 50
+            options_prediction = gain_prediction_score * 1.2 + volatility * 50
             
             return {
                 'ticker': ticker,
@@ -372,330 +403,296 @@ class RetroTerminal:
                 'sma_5': sma_5,
                 'sma_20': sma_20,
                 'yesterday_profit_score': yesterday_profit_score,
-                'tomorrow_prediction_score': prediction_score,
+                'tomorrow_gain_score': gain_prediction_score,  # NEW: Focus on gain prediction
                 'options_score': options_score,
                 'options_prediction': options_prediction,
                 'market_cap': info.get('marketCap', 0),
                 'pe_ratio': info.get('trailingPE', 0),
-                # Price prediction data
-                'predicted_low': price_predictions['predicted_low'],
-                'predicted_high': price_predictions['predicted_high'],
-                'predicted_median': price_predictions['predicted_median'],
-                'confidence_level': price_predictions['confidence_level'],
-                'upside_potential': price_predictions['upside_potential'],
-                'downside_risk': price_predictions['downside_risk'],
-                'expected_return': price_predictions['expected_return'],
-                'expected_move': price_predictions['expected_move']
+                # Gain prediction data
+                'expected_gain_pct': gain_potential['expected_gain_pct'],
+                'median_gain_pct': gain_potential['median_gain_pct'],
+                'conservative_target': gain_potential['conservative_target'],
+                'moderate_target': gain_potential['moderate_target'],
+                'aggressive_target': gain_potential['aggressive_target'],
+                'probability_positive': gain_potential['probability_positive'],
+                'confidence_level': gain_potential['confidence_level'],
+                'risk_reward_ratio': gain_potential['risk_reward_ratio']
             }
             
         except Exception as e:
             return None
     
-    def calculate_tomorrow_prediction(self, hist, current_price, volatility, rsi, macd, bb_position, 
-                                    volume_trend, momentum_1d, momentum_3d, momentum_5d):
+    def calculate_tomorrow_gain_prediction(self, hist, current_price, volatility, rsi, macd, bb_position, 
+                                          volume_trend, momentum_1d, momentum_3d, momentum_5d):
         """
-        Elite quantitative prediction algorithm incorporating advanced mathematical models
-        from top hedge funds: Renaissance Technologies, Two Sigma, Citadel, D.E. Shaw
+        Predict tomorrow's percentage gain potential for stock discovery
+        Focus: Which stocks will have highest % gains from today to tomorrow
         """
         
-        # Import required libraries for advanced calculations
-        from scipy.stats import norm, skew, kurtosis
-        from scipy import optimize
+        from scipy.stats import norm
         
-        # === RENAISSANCE TECHNOLOGIES INSPIRED MODELS ===
+        # === BULLISH MOMENTUM INDICATORS ===
         
-        # 1. Multi-Scale Mean Reversion (Ornstein-Uhlenbeck Process)
-        def mean_reversion_ou_process():
-            theta = 0.1  # Mean reversion speed
-            mu = 50  # Long-term RSI mean
-            sigma = 15  # RSI volatility
-            
-            ou_score = theta * (mu - rsi) * np.exp(-theta * 1)  # 1-day prediction
-            return max(0, abs(ou_score))
+        # 1. Oversold Bounce Potential (Mean Reversion)
+        oversold_score = 0
+        if rsi < 35:  # Oversold conditions
+            oversold_score = (35 - rsi) * 4  # More aggressive scoring
+            if bb_position < 0.15:  # Near lower Bollinger Band
+                oversold_score *= 2.0  # Double the score
+            if rsi < 25:  # Extremely oversold
+                oversold_score *= 1.5  # Extra boost for extreme conditions
         
-        # 2. Momentum Factor (Jegadeesh-Titman with decay)
-        def momentum_factor():
-            weights = np.array([0.5, 0.3, 0.2])  # Recent bias
-            momentums = np.array([momentum_1d, momentum_3d, momentum_5d])
-            
-            # Apply exponential decay for recency bias
-            decay_factor = np.exp(-np.arange(3) * 0.1)
-            weighted_momentum = np.sum(momentums * weights * decay_factor)
-            
-            # Carhart 4-factor model enhancement
-            momentum_score = weighted_momentum * 100 * (1 + volatility * 2)
-            return momentum_score
+        # 2. Momentum Acceleration (Trend Following)
+        momentum_acceleration = 0
+        if momentum_1d > 0 and momentum_3d > momentum_1d:  # Accelerating upward
+            momentum_acceleration = momentum_3d * 15  # More aggressive
+            if volume_trend > 1.5:  # Backed by volume
+                momentum_acceleration *= 2.0
+        elif momentum_1d > 2 and momentum_3d > 0:  # Strong recent momentum
+            momentum_acceleration = momentum_1d * 20
         
-        # 3. GARCH Volatility Clustering Prediction
-        def garch_volatility_prediction():
-            if len(hist) < 10:
-                return volatility * 50
-                
-            returns = hist['Close'].pct_change().dropna()
-            
-            # Simple GARCH(1,1) approximation
-            alpha = 0.1  # Short-term vol persistence
-            beta = 0.85  # Long-term vol persistence
-            gamma = 0.05  # Innovation weight
-            
-            recent_vol = returns.tail(5).std()
-            long_term_vol = returns.std()
-            
-            predicted_vol = np.sqrt(gamma + alpha * recent_vol**2 + beta * long_term_vol**2)
-            return predicted_vol * 200  # Scale for scoring
+        # 3. High Volatility Opportunity Boost
+        volatility_boost = 0
+        if volatility > 0.4:  # High volatility = high potential gains
+            volatility_boost = volatility * 50
+        elif volatility > 0.6:  # Extreme volatility
+            volatility_boost = volatility * 80
         
-        # 4. Jump Diffusion Model (Merton Jump)
-        def jump_diffusion_score():
-            if len(hist) < 20:
-                return 0
-                
-            returns = hist['Close'].pct_change().dropna()
-            
-            # Detect jumps (returns > 2 standard deviations)
-            std_returns = returns.std()
-            jump_threshold = 2 * std_returns
-            recent_jumps = np.sum(np.abs(returns.tail(5)) > jump_threshold)
-            
-            # Jump intensity lambda
-            jump_intensity = recent_jumps / 5
-            jump_score = jump_intensity * 30 * (1 + volatility)
-            
-            return jump_score
-        
-        # 5. Liquidity Risk Premium (Pastor-Stambaugh)
-        def liquidity_risk_premium():
-            # Volume-based liquidity measure
-            avg_volume = hist['Volume'].tail(20).mean() if len(hist) >= 20 else 1
-            current_volume = hist['Volume'].iloc[-1] if len(hist) > 0 else 1
-            
-            illiquidity = 1 / (1 + volume_trend)
-            liquidity_score = illiquidity * volatility * 25
-            
-            return liquidity_score
-        
-        # 6. Options Flow Implied Probability (Black-Scholes Greeks)
-        def options_flow_analysis():
-            # Estimate delta-hedging flows
-            S = current_price
-            K = S * 1.02  # Assume ATM strikes
-            T = 1/252  # 1 day to expiration
-            r = 0.05  # Risk-free rate
-            sigma = volatility
-            
-            # Black-Scholes delta approximation
-            d1 = (np.log(S/K) + (r + 0.5*sigma**2)*T) / (sigma*np.sqrt(T)) if sigma > 0 else 0
-            delta = norm.cdf(d1) if sigma > 0 else 0.5
-            
-            # Gamma exposure
-            gamma = norm.pdf(d1) / (S * sigma * np.sqrt(T)) if sigma > 0 and S > 0 else 0
-            
-            # Options flow pressure score
-            flow_score = (abs(delta - 0.5) + gamma * S * 0.01) * 100
-            
-            return flow_score
-        
-        # 7. Regime Detection (Hidden Markov Model approximation)
-        def regime_detection():
-            if len(hist) < 30:
-                return 10
-                
-            returns = hist['Close'].pct_change().dropna()
-            
-            # Simple 2-regime model: High vol vs Low vol
-            rolling_vol = returns.rolling(10).std()
-            current_regime_vol = rolling_vol.iloc[-1] if len(rolling_vol) > 0 else volatility
-            historical_vol = rolling_vol.mean()
-            
-            # Regime transition probability
-            if current_regime_vol > historical_vol * 1.5:
-                regime_score = 25  # High vol regime
-            else:
-                regime_score = 10  # Low vol regime
-                
-            return regime_score
-        
-        # 8. Market Microstructure (Kyle's Lambda)
-        def microstructure_impact():
-            # Price impact of order flow
-            if len(hist) < 5:
-                return 5
-                
-            price_changes = hist['Close'].diff().abs().tail(5)
-            volume_changes = hist['Volume'].tail(5)
-            
-            # Kyle's lambda approximation
-            kyle_lambda = (price_changes / volume_changes).mean() if volume_changes.mean() > 0 else 0
-            kyle_lambda = np.nan_to_num(kyle_lambda)
-            
-            impact_score = kyle_lambda * current_price * volume_trend
-            return min(20, impact_score)
-        
-        # 9. Behavioral Finance Factors (Overreaction/Underreaction)
-        def behavioral_factors():
-            behavioral_score = 0
-            
-            # Overreaction after big moves
-            if abs(momentum_1d) > 0.05:  # 5% move
-                behavioral_score += 15  # Expect reversal
-                
-            # Underreaction to earnings/news (momentum continuation)
-            if 0.02 < abs(momentum_1d) < 0.04:  # 2-4% move
-                behavioral_score += 10  # Expect continuation
-                
-            # Disposition effect (loss aversion)
-            if momentum_3d < -0.1:  # 10% decline over 3 days
-                behavioral_score += 20  # Selling pressure continues
-                
-            return behavioral_score
-        
-        # 10. Advanced Pattern Recognition
-        def pattern_recognition():
-            if len(hist) < 20:
-                return 0
-                
-            prices = hist['Close'].values
-            pattern_score = 0
-            
-            # Head and shoulders pattern
-            recent_prices = prices[-20:]
-            peaks = []
-            for i in range(1, len(recent_prices)-1):
-                if recent_prices[i] > recent_prices[i-1] and recent_prices[i] > recent_prices[i+1]:
-                    peaks.append((i, recent_prices[i]))
-            
-            if len(peaks) >= 3:
-                pattern_score += 15
-                
-            # Support/resistance levels
-            support_level = np.min(prices[-10:])
-            resistance_level = np.max(prices[-10:])
-            
-            if current_price <= support_level * 1.01:
-                pattern_score += 20  # Near support
-            elif current_price >= resistance_level * 0.99:
-                pattern_score += 20  # Near resistance
-                
-            return pattern_score
-        
-        # === COMBINE ALL FACTORS ===
+        # 4. Small/Mid-Cap Growth Boost
+        # Smaller stocks tend to have higher % moves
+        small_cap_boost = 0
         try:
-            factor_scores = {
-                'mean_reversion': mean_reversion_ou_process(),
-                'momentum': momentum_factor(),
-                'volatility': garch_volatility_prediction(),
-                'jump_diffusion': jump_diffusion_score(),
-                'liquidity': liquidity_risk_premium(),
-                'options_flow': options_flow_analysis(),
-                'regime': regime_detection(),
-                'microstructure': microstructure_impact(),
-                'behavioral': behavioral_factors(),
-                'pattern_recognition': pattern_recognition()
-            }
-        except Exception as e:
-            # Fallback to simple calculation if advanced methods fail
-            factor_scores = {
-                'mean_reversion': abs(50 - rsi),
-                'momentum': abs(momentum_1d) * 50,
-                'volatility': volatility * 100,
-                'jump_diffusion': 0,
-                'liquidity': 10,
-                'options_flow': volatility * 50,
-                'regime': 15,
-                'microstructure': 5,
-                'behavioral': 10,
-                'pattern_recognition': 5
-            }
+            if len(hist) > 10:
+                avg_volume = hist['Volume'].tail(20).mean()
+                if avg_volume < 5000000:  # Lower volume = smaller cap
+                    small_cap_boost = 15
+                elif avg_volume < 2000000:  # Very small cap
+                    small_cap_boost = 25
+        except:
+            pass
         
-        # Advanced weighting scheme (adaptive based on market conditions)
-        base_weights = {
-            'mean_reversion': 0.15,
-            'momentum': 0.15,
-            'volatility': 0.15,
-            'jump_diffusion': 0.10,
-            'liquidity': 0.10,
-            'options_flow': 0.10,
-            'regime': 0.05,
-            'microstructure': 0.05,
-            'behavioral': 0.05,
-            'pattern_recognition': 0.10
-        }
+        # 3. Breakout Probability (Technical Analysis)
+        breakout_score = 0
+        if len(hist) >= 20:
+            # Near resistance with momentum
+            recent_high = hist['High'].tail(20).max()
+            if current_price > recent_high * 0.98 and momentum_1d > 1:
+                breakout_score = 25
+            
+            # Consolidation breakout
+            price_range = hist['High'].tail(10).max() - hist['Low'].tail(10).min()
+            consolidation_ratio = price_range / current_price
+            if consolidation_ratio < 0.03 and volume_trend > 1.3:  # Tight range + volume
+                breakout_score += 20
         
-        # Adjust weights based on volatility regime
-        if volatility > 0.3:  # High vol regime
-            base_weights['volatility'] *= 1.5
-            base_weights['jump_diffusion'] *= 1.3
-            base_weights['momentum'] *= 0.8
-        else:  # Low vol regime
-            base_weights['momentum'] *= 1.2
-            base_weights['mean_reversion'] *= 1.1
+        # 4. Volume Surge Prediction (Smart Money)
+        volume_score = 0
+        if volume_trend > 2.0:  # Exceptional volume
+            volume_score = 30
+        elif volume_trend > 1.5:  # High volume
+            volume_score = 15
         
-        # Calculate weighted score
-        total_score = sum(factor_scores[factor] * weight for factor, weight in base_weights.items())
+        # Add volume pattern analysis
+        if len(hist) >= 5:
+            recent_volume = hist['Volume'].tail(3).mean()
+            previous_volume = hist['Volume'].tail(10).head(7).mean()
+            volume_increase = recent_volume / previous_volume if previous_volume > 0 else 1
+            if volume_increase > 1.5:
+                volume_score += 15
         
-        # Store factor breakdown for analysis
-        self.last_prediction_factors = factor_scores
+        # 5. MACD Signal Strength
+        macd_score = 0
+        if macd > 0:  # Bullish MACD
+            macd_score = min(20, abs(macd) * 2000)
+            if momentum_1d > 0:  # Confirmed by price momentum
+                macd_score *= 1.3
         
-        return max(0, min(100, total_score))
+        # 6. Options Activity Indicator (Implied Movement)
+        options_activity_score = 0
+        if volatility > 0.3:  # High IV suggests expected movement
+            options_activity_score = volatility * 25
+            if momentum_1d > 0:  # Bullish direction
+                options_activity_score *= 1.2
+        
+        # 7. Sector Rotation Signal
+        sector_score = 5  # Base score (placeholder for sector strength)
+        
+        # 8. Earnings/Event Proximity Boost
+        event_score = 0
+        if volatility > 0.4:  # Often precedes earnings
+            event_score = 10
+            if rsi < 40:  # Oversold before event
+                event_score += 10
+        
+        # 9. Gap Probability (Pre-market Movement)
+        gap_score = 0
+        if len(hist) >= 10:
+            # Calculate historical gap frequency and size
+            gaps = []
+            for i in range(1, min(10, len(hist))):
+                if i < len(hist):
+                    gap = (hist['Open'].iloc[-i] - hist['Close'].iloc[-i-1]) / hist['Close'].iloc[-i-1]
+                    gaps.append(gap)
+            
+            if gaps:
+                avg_gap = np.mean([abs(g) for g in gaps])
+                positive_gaps = sum(1 for g in gaps if g > 0.01)  # 1%+ gaps
+                
+                if avg_gap > 0.01 and positive_gaps >= 3:
+                    gap_score = 15
+        
+        # 10. Technical Pattern Recognition
+        pattern_score = 0
+        if len(hist) >= 15:
+            closes = hist['Close'].tail(15).values
+            
+            # Cup and Handle pattern approximation
+            if len(closes) >= 10:
+                mid_point = len(closes) // 2
+                left_side = closes[:mid_point]
+                right_side = closes[mid_point:]
+                
+                if len(left_side) > 0 and len(right_side) > 0:
+                    left_trend = np.polyfit(range(len(left_side)), left_side, 1)[0]
+                    right_trend = np.polyfit(range(len(right_side)), right_side, 1)[0]
+                    
+                    if left_trend < 0 and right_trend > 0:  # Down then up
+                        pattern_score += 15
+            
+            # Flag pattern (consolidation after strong move)
+            if momentum_5d > 5 and abs(momentum_1d) < 1:  # Strong 5-day, flat recent
+                pattern_score += 10
+        
+        # === COMBINE BULLISH FACTORS ===
+        total_bullish_score = (
+            oversold_score * 0.25 +           # Mean reversion (increased weight)
+            momentum_acceleration * 0.20 +     # Momentum (increased weight)
+            breakout_score * 0.15 +           # Breakouts
+            volume_score * 0.15 +             # Volume
+            volatility_boost * 0.10 +         # Volatility boost (new)
+            small_cap_boost * 0.05 +          # Small cap boost (new)
+            macd_score * 0.05 +               # MACD
+            options_activity_score * 0.03 +   # Options activity
+            event_score * 0.01 +              # Events
+            gap_score * 0.005 +               # Gaps
+            pattern_score * 0.005             # Patterns
+        )
+        
+        # === RISK ADJUSTMENT ===
+        # Penalize very high volatility (too risky)
+        if volatility > 0.8:
+            total_bullish_score *= 0.7
+        
+        # Boost for optimal volatility range
+        if 0.2 < volatility < 0.5:
+            total_bullish_score *= 1.1
+        
+        # Penalize overbought conditions
+        if rsi > 75:
+            total_bullish_score *= 0.6
+        
+        # === CONFIDENCE WEIGHTING ===
+        data_quality = min(len(hist) / 30, 1.0)  # More data = higher confidence
+        final_score = total_bullish_score * data_quality
+        
+        return max(0, min(100, final_score))
     
-    def calculate_price_predictions(self, hist, current_price, volatility, prediction_score):
+    def calculate_tomorrow_gain_potential(self, hist, current_price, volatility, gain_prediction_score):
         """
-        Advanced price prediction with confidence intervals
-        Based on Monte Carlo simulation and quantitative models
+        Calculate tomorrow's upward gain potential for stock discovery
+        Focus: Expected percentage gain from today to tomorrow
         """
         
-        # Monte Carlo price simulation
+        # Base expected gain calculation
         np.random.seed(42)  # For reproducible results
-        n_simulations = 10000
-        dt = 1/252  # 1 trading day
+        n_simulations = 5000
         
-        # Calculate drift (expected return)
+        # Calculate historical upward move statistics
         if len(hist) >= 20:
             returns = hist['Close'].pct_change().dropna()
-            drift = returns.mean()
-            # Adjust drift based on prediction score
-            drift = drift * (1 + (prediction_score - 50) / 100)
+            positive_returns = returns[returns > 0]
+            
+            if len(positive_returns) > 0:
+                avg_positive_return = positive_returns.mean()
+                std_positive_return = positive_returns.std()
+                
+                # Adjust based on prediction score
+                expected_gain_multiplier = 1 + (gain_prediction_score - 50) / 100
+                expected_daily_gain = avg_positive_return * expected_gain_multiplier
+            else:
+                expected_daily_gain = 0.01  # 1% default
         else:
-            drift = 0.001  # Small positive drift
+            expected_daily_gain = 0.01
         
-        # Generate random price paths
-        z = np.random.standard_normal(n_simulations)
+        # Monte Carlo for upward scenarios only
+        # Focus on bullish scenarios weighted by prediction score
+        bullish_weight = min(0.8, gain_prediction_score / 100)  # Higher score = more bullish scenarios
         
-        # Geometric Brownian Motion with jump component
-        jump_prob = 0.05  # 5% chance of jump
-        jump_size = np.random.normal(0, 0.02, n_simulations)  # 2% average jump
-        jumps = np.random.binomial(1, jump_prob, n_simulations) * jump_size
+        gains = []
+        for _ in range(n_simulations):
+            if np.random.random() < bullish_weight:
+                # Bullish scenario
+                daily_return = np.random.lognormal(
+                    mean=np.log(1 + expected_daily_gain),
+                    sigma=volatility / np.sqrt(252)
+                ) - 1
+            else:
+                # Mixed scenario
+                daily_return = np.random.normal(0, volatility / np.sqrt(252))
+            
+            gains.append(daily_return)
         
-        # Price simulation
-        price_changes = drift * dt + volatility * np.sqrt(dt) * z + jumps
-        predicted_prices = current_price * np.exp(price_changes)
+        gains = np.array(gains)
+        positive_gains = gains[gains > 0]
         
-        # Calculate statistics
-        price_low = np.percentile(predicted_prices, 10)  # 10th percentile
-        price_high = np.percentile(predicted_prices, 90)  # 90th percentile
-        price_median = np.median(predicted_prices)
-        price_mean = np.mean(predicted_prices)
+        if len(positive_gains) > 0:
+            # Calculate gain statistics
+            expected_gain_pct = np.mean(positive_gains) * 100
+            median_gain_pct = np.median(positive_gains) * 100
+            percentile_75_gain = np.percentile(positive_gains, 75) * 100
+            percentile_90_gain = np.percentile(positive_gains, 90) * 100
+            
+            # Probability of positive move
+            prob_positive = len(positive_gains) / len(gains) * 100
+        else:
+            expected_gain_pct = 0.5
+            median_gain_pct = 0.3
+            percentile_75_gain = 1.0
+            percentile_90_gain = 2.0
+            prob_positive = 50
         
-        # Calculate confidence level based on prediction factors
-        confidence = min(95, max(60, prediction_score * 0.8 + 20))
+        # Enhanced target price calculation
+        conservative_target = current_price * (1 + median_gain_pct / 100)
+        moderate_target = current_price * (1 + percentile_75_gain / 100)
+        aggressive_target = current_price * (1 + percentile_90_gain / 100)
         
-        # Expected move calculation (similar to options straddle pricing)
-        expected_move = current_price * volatility * np.sqrt(dt)
+        # Confidence calculation based on multiple factors
+        base_confidence = min(95, max(60, gain_prediction_score * 0.8 + 20))
+        
+        # Adjust confidence based on historical performance
+        if prob_positive > 60:
+            confidence_adj = 1.1
+        elif prob_positive < 45:
+            confidence_adj = 0.9
+        else:
+            confidence_adj = 1.0
+        
+        final_confidence = min(95, base_confidence * confidence_adj)
         
         return {
             'current_price': current_price,
-            'predicted_low': price_low,
-            'predicted_high': price_high,
-            'predicted_median': price_median,
-            'predicted_mean': price_mean,
-            'expected_move': expected_move,
-            'confidence_level': confidence,
-            'upside_potential': (price_high - current_price) / current_price * 100,
-            'downside_risk': (current_price - price_low) / current_price * 100,
-            'expected_return': (price_mean - current_price) / current_price * 100
+            'expected_gain_pct': expected_gain_pct,
+            'median_gain_pct': median_gain_pct,
+            'conservative_target': conservative_target,
+            'moderate_target': moderate_target,
+            'aggressive_target': aggressive_target,
+            'probability_positive': prob_positive,
+            'confidence_level': final_confidence,
+            'risk_reward_ratio': percentile_75_gain / max(0.5, volatility * 100 / np.sqrt(252))
         }
 
     def scan_all_tickers(self):
-        """Scan all S&P 500 tickers for opportunities"""
+        """Scan expanded NASDAQ universe for fresh gain opportunities"""
         if 'market_scan_data' not in st.session_state or st.session_state.get('last_scan_time', 0) < time.time() - 300:
             
             progress_bar = st.progress(0)
@@ -703,20 +700,47 @@ class RetroTerminal:
             
             results = []
             
-            with ThreadPoolExecutor(max_workers=10) as executor:
-                futures = {executor.submit(self.fetch_ticker_data, ticker): ticker for ticker in self.sp500_tickers}
+            # Prioritize fresh opportunities - avoid recent winners
+            available_tickers = [t for t in self.all_tickers if t not in self.previous_winners]
+            if len(available_tickers) < 50:  # Reset if too few available
+                self.previous_winners.clear()
+                available_tickers = self.all_tickers
+            
+            # Randomize for variety
+            import random
+            random.shuffle(available_tickers)
+            
+            with ThreadPoolExecutor(max_workers=15) as executor:
+                futures = {executor.submit(self.fetch_ticker_data, ticker): ticker for ticker in available_tickers}
                 
                 for i, future in enumerate(futures):
                     progress = (i + 1) / len(futures)
                     progress_bar.progress(progress)
-                    status_text.text(f"SCANNING: {futures[future]} ({i+1}/{len(futures)})")
+                    status_text.text(f"SCANNING NASDAQ: {futures[future]} ({i+1}/{len(futures)})")
                     
                     try:
                         result = future.result(timeout=5)
-                        if result:
+                        if result and result.get('tomorrow_gain_score', 0) > 0:
                             results.append(result)
                     except:
                         continue
+            
+            # Filter for high-gain potential stocks and ensure variety
+            if results:
+                # Sort by gain score and take top performers
+                results_df = pd.DataFrame(results)
+                high_gain_stocks = results_df[results_df['tomorrow_gain_score'] > 30]
+                
+                if len(high_gain_stocks) > 10:
+                    # Ensure variety by avoiding too many from same sector
+                    diversified_results = self.diversify_stock_selection(high_gain_stocks)
+                    results = diversified_results.to_dict('records')
+                else:
+                    results = results_df.to_dict('records')
+                
+                # Update previous winners to ensure fresh picks next time
+                top_gainers = results_df.nlargest(20, 'tomorrow_gain_score')['ticker'].tolist()
+                self.previous_winners.update(top_gainers[:10])  # Remember top 10
             
             progress_bar.empty()
             status_text.empty()
@@ -725,13 +749,51 @@ class RetroTerminal:
             st.session_state.last_scan_time = time.time()
             
         return st.session_state.market_scan_data
+    
+    def diversify_stock_selection(self, df):
+        """Ensure variety in stock selection across different categories"""
+        
+        # Define sector categories based on ticker patterns
+        sector_groups = {
+            'tech_giants': ['AAPL', 'MSFT', 'GOOGL', 'GOOG', 'AMZN', 'META', 'NVDA'],
+            'semiconductors': ['AMD', 'INTC', 'QCOM', 'AMAT', 'LRCX', 'KLAC', 'MRVL', 'MCHP'],
+            'biotech': ['GILD', 'AMGN', 'VRTX', 'BIIB', 'REGN', 'MRNA', 'BNTX'],
+            'growth_stocks': ['ROKU', 'ZOOM', 'SNOW', 'PLTR', 'RBLX', 'CRWD', 'DDOG'],
+            'meme_stocks': ['AMC', 'GME', 'BB', 'NOK', 'SPCE', 'CLOV', 'WISH'],
+            'etfs_leveraged': ['SOXL', 'TQQQ', 'UPRO', 'SPXL', 'TECL', 'WEBL'],
+            'consumer': ['COST', 'SBUX', 'LULU', 'ABNB', 'UBER', 'LYFT', 'DASH'],
+            'fintech': ['SQ', 'PYPL', 'HOOD', 'COIN', 'SOFI', 'OPEN']
+        }
+        
+        diversified_picks = []
+        
+        # Pick top 1-2 from each category
+        for category, tickers in sector_groups.items():
+            category_stocks = df[df['ticker'].isin(tickers)]
+            if len(category_stocks) > 0:
+                top_in_category = category_stocks.nlargest(2, 'tomorrow_gain_score')
+                diversified_picks.append(top_in_category)
+        
+        # Combine and ensure we have enough variety
+        if diversified_picks:
+            result_df = pd.concat(diversified_picks).drop_duplicates()
+            
+            # If we need more stocks, add highest scorers not yet included
+            if len(result_df) < 30:
+                remaining_stocks = df[~df['ticker'].isin(result_df['ticker'])]
+                additional = remaining_stocks.nlargest(30 - len(result_df), 'tomorrow_gain_score')
+                result_df = pd.concat([result_df, additional])
+            
+            return result_df.nlargest(50, 'tomorrow_gain_score')  # Return top 50 for variety
+        
+        return df.nlargest(50, 'tomorrow_gain_score')
 
     def display_top_opportunities(self):
         """Display top trading opportunities - both historical and predictive"""
         
         st.markdown("""
         <div class="terminal-box">
-            <div class="terminal-prompt">[MARKET SCANNER] OPPORTUNITY ANALYSIS SYSTEM</div>
+            <div class="terminal-prompt">[NASDAQ SCANNER] FRESH GAIN OPPORTUNITY DISCOVERY</div>
         </div>
         """, unsafe_allow_html=True)
         
@@ -750,9 +812,9 @@ class RetroTerminal:
             ['ticker', 'price', 'change_pct', 'volatility', 'volume_ratio', 'yesterday_profit_score']
         ]
         
-        # 2. Tomorrow's predicted swing opportunities
-        tomorrow_swing = df.nlargest(10, 'tomorrow_prediction_score')[
-            ['ticker', 'price', 'predicted_median', 'confidence_level', 'upside_potential', 'downside_risk', 'tomorrow_prediction_score']
+        # 2. Tomorrow's highest predicted gains (MAIN FOCUS)
+        tomorrow_gains = df.nlargest(10, 'tomorrow_gain_score')[
+            ['ticker', 'price', 'expected_gain_pct', 'probability_positive', 'confidence_level', 'conservative_target', 'tomorrow_gain_score']
         ]
         
         # 3. Yesterday's options opportunities
@@ -762,13 +824,13 @@ class RetroTerminal:
         
         # 4. Tomorrow's predicted options opportunities
         tomorrow_options = df.nlargest(10, 'options_prediction')[
-            ['ticker', 'price', 'predicted_low', 'predicted_high', 'expected_move', 'confidence_level', 'options_prediction']
+            ['ticker', 'price', 'expected_gain_pct', 'moderate_target', 'aggressive_target', 'confidence_level', 'options_prediction']
         ]
         
         # Create tabs for different time horizons
         tab1, tab2, tab3, tab4 = st.tabs([
             "YESTERDAY'S WINNERS", 
-            "TOMORROW'S PREDICTIONS", 
+            "TOMORROW'S BEST GAINS", 
             "OPTIONS - YESTERDAY", 
             "OPTIONS - TOMORROW"
         ])
@@ -797,30 +859,30 @@ class RetroTerminal:
         with tab2:
             st.markdown("""
             <div class="terminal-box">
-                <div class="terminal-prompt">[PREDICTIVE] TOP 10 SWING TRADES FOR NEXT SESSION</div>
-                <div style="font-size: 12px; color: #ffff00;">AI-POWERED PREDICTIONS: Stocks likely to move significantly tomorrow</div>
+                <div class="terminal-prompt">[NASDAQ DISCOVERY] TOP 10 FRESH STOCKS FOR HIGHEST GAINS</div>
+                <div style="font-size: 12px; color: #ffff00;">🎯 NEW OPPORTUNITIES: Different stocks predicted for biggest % gains tomorrow</div>
             </div>
             """, unsafe_allow_html=True)
             
-            # Format tomorrow's predictions table
-            tomorrow_swing_display = tomorrow_swing.copy()
-            tomorrow_swing_display['CURRENT'] = tomorrow_swing_display['price'].apply(lambda x: f"${x:.2f}")
-            tomorrow_swing_display['PREDICTED'] = tomorrow_swing_display['predicted_median'].apply(lambda x: f"${x:.2f}")
-            tomorrow_swing_display['CONFIDENCE'] = tomorrow_swing_display['confidence_level'].apply(lambda x: f"{x:.0f}%")
-            tomorrow_swing_display['UPSIDE'] = tomorrow_swing_display['upside_potential'].apply(lambda x: f"+{x:.1f}%")
-            tomorrow_swing_display['DOWNSIDE'] = tomorrow_swing_display['downside_risk'].apply(lambda x: f"-{x:.1f}%")
-            tomorrow_swing_display['SCORE'] = tomorrow_swing_display['tomorrow_prediction_score'].apply(lambda x: f"{x:.0f}")
+            # Format tomorrow's gain predictions table
+            tomorrow_gains_display = tomorrow_gains.copy()
+            tomorrow_gains_display['CURRENT'] = tomorrow_gains_display['price'].apply(lambda x: f"${x:.2f}")
+            tomorrow_gains_display['EXP_GAIN'] = tomorrow_gains_display['expected_gain_pct'].apply(lambda x: f"+{x:.2f}%")
+            tomorrow_gains_display['TARGET'] = tomorrow_gains_display['conservative_target'].apply(lambda x: f"${x:.2f}")
+            tomorrow_gains_display['WIN_PROB'] = tomorrow_gains_display['probability_positive'].apply(lambda x: f"{x:.0f}%")
+            tomorrow_gains_display['CONFIDENCE'] = tomorrow_gains_display['confidence_level'].apply(lambda x: f"{x:.0f}%")
+            tomorrow_gains_display['SCORE'] = tomorrow_gains_display['tomorrow_gain_score'].apply(lambda x: f"{x:.0f}")
             
-            tomorrow_swing_display = tomorrow_swing_display[['ticker', 'CURRENT', 'PREDICTED', 'CONFIDENCE', 'UPSIDE', 'DOWNSIDE', 'SCORE']]
-            tomorrow_swing_display.columns = ['TICKER', 'CURRENT', 'PREDICTED', 'CONFIDENCE', 'UPSIDE', 'DOWNSIDE', 'SCORE']
+            tomorrow_gains_display = tomorrow_gains_display[['ticker', 'CURRENT', 'EXP_GAIN', 'TARGET', 'WIN_PROB', 'CONFIDENCE', 'SCORE']]
+            tomorrow_gains_display.columns = ['TICKER', 'CURRENT', 'EXP_GAIN', 'TARGET', 'WIN_PROB', 'CONFIDENCE', 'SCORE']
             
-            st.dataframe(tomorrow_swing_display, use_container_width=True, hide_index=True)
+            st.dataframe(tomorrow_gains_display, use_container_width=True, hide_index=True)
             
             # Add prediction methodology
             st.markdown("""
             <div style="font-size: 11px; color: #888888; margin-top: 10px;">
-                PREDICTION MODEL: Ornstein-Uhlenbeck mean reversion, GARCH volatility clustering, 
-                Merton jump diffusion, Black-Scholes Greeks, regime detection, behavioral finance factors
+                NASDAQ DISCOVERY: Scanning 100+ NASDAQ stocks for fresh opportunities, avoiding recent winners,
+                focusing on breakout potential, oversold bounces, momentum acceleration, high-volatility plays
             </div>
             """, unsafe_allow_html=True)
         
@@ -847,29 +909,29 @@ class RetroTerminal:
         with tab4:
             st.markdown("""
             <div class="terminal-box">
-                <div class="terminal-prompt">[PREDICTIVE] TOP 10 OPTIONS PLAYS FOR NEXT SESSION</div>
-                <div style="font-size: 12px; color: #ffff00;">AI-POWERED PREDICTIONS: Best options opportunities for tomorrow</div>
+                <div class="terminal-prompt">[PREDICTIVE] TOP 10 OPTIONS PLAYS FOR MAXIMUM GAINS</div>
+                <div style="font-size: 12px; color: #ffff00;">🎯 CALL OPTIONS: Stocks predicted for biggest moves tomorrow</div>
             </div>
             """, unsafe_allow_html=True)
             
             # Format tomorrow's options table
             tomorrow_options_display = tomorrow_options.copy()
             tomorrow_options_display['CURRENT'] = tomorrow_options_display['price'].apply(lambda x: f"${x:.2f}")
-            tomorrow_options_display['LOW_TARGET'] = tomorrow_options_display['predicted_low'].apply(lambda x: f"${x:.2f}")
-            tomorrow_options_display['HIGH_TARGET'] = tomorrow_options_display['predicted_high'].apply(lambda x: f"${x:.2f}")
-            tomorrow_options_display['EXP_MOVE'] = tomorrow_options_display['expected_move'].apply(lambda x: f"±${x:.2f}")
+            tomorrow_options_display['EXP_GAIN'] = tomorrow_options_display['expected_gain_pct'].apply(lambda x: f"+{x:.2f}%")
+            tomorrow_options_display['MOD_TARGET'] = tomorrow_options_display['moderate_target'].apply(lambda x: f"${x:.2f}")
+            tomorrow_options_display['AGG_TARGET'] = tomorrow_options_display['aggressive_target'].apply(lambda x: f"${x:.2f}")
             tomorrow_options_display['CONFIDENCE'] = tomorrow_options_display['confidence_level'].apply(lambda x: f"{x:.0f}%")
             tomorrow_options_display['SCORE'] = tomorrow_options_display['options_prediction'].apply(lambda x: f"{x:.0f}")
             
-            tomorrow_options_display = tomorrow_options_display[['ticker', 'CURRENT', 'LOW_TARGET', 'HIGH_TARGET', 'EXP_MOVE', 'CONFIDENCE', 'SCORE']]
-            tomorrow_options_display.columns = ['TICKER', 'CURRENT', 'LOW_TARGET', 'HIGH_TARGET', 'EXP_MOVE', 'CONFIDENCE', 'SCORE']
+            tomorrow_options_display = tomorrow_options_display[['ticker', 'CURRENT', 'EXP_GAIN', 'MOD_TARGET', 'AGG_TARGET', 'CONFIDENCE', 'SCORE']]
+            tomorrow_options_display.columns = ['TICKER', 'CURRENT', 'EXP_GAIN', 'MOD_TARGET', 'AGG_TARGET', 'CONFIDENCE', 'SCORE']
             
             st.dataframe(tomorrow_options_display, use_container_width=True, hide_index=True)
         
-        # Enhanced market summary with predictions
+        # Enhanced market summary with gain predictions
         st.markdown("""
         <div class="terminal-box">
-            <div class="terminal-prompt">[MARKET INTELLIGENCE] PREDICTIVE ANALYTICS SUMMARY</div>
+            <div class="terminal-prompt">[MARKET INTELLIGENCE] TOMORROW'S GAIN OPPORTUNITY SUMMARY</div>
         </div>
         """, unsafe_allow_html=True)
         
@@ -880,26 +942,26 @@ class RetroTerminal:
             st.metric("AVG YESTERDAY SCORE", f"{avg_yesterday:.0f}")
         
         with col2:
-            avg_tomorrow = df['tomorrow_prediction_score'].mean()
-            st.metric("AVG TOMORROW PRED", f"{avg_tomorrow:.0f}")
+            avg_gain_score = df['tomorrow_gain_score'].mean()
+            st.metric("AVG GAIN SCORE", f"{avg_gain_score:.0f}")
         
         with col3:
-            high_confidence = len(df[df['tomorrow_prediction_score'] > 70])
-            st.metric("HIGH CONFIDENCE", f"{high_confidence}")
+            high_gain_stocks = len(df[df['tomorrow_gain_score'] > 70])
+            st.metric("HIGH GAIN POTENTIAL", f"{high_gain_stocks}")
         
         with col4:
-            breakout_candidates = len(df[df['bb_position'] > 0.8]) + len(df[df['bb_position'] < 0.2])
-            st.metric("BREAKOUT CANDIDATES", f"{breakout_candidates}")
+            avg_expected_gain = df['expected_gain_pct'].mean()
+            st.metric("AVG EXP GAIN", f"+{avg_expected_gain:.2f}%")
         
         with col5:
-            volume_surge = len(df[df['volume_trend'] > 1.5])
-            st.metric("VOLUME SURGES", f"{volume_surge}")
+            high_confidence = len(df[df['confidence_level'] > 80])
+            st.metric("HIGH CONFIDENCE", f"{high_confidence}")
             
-        # Prediction confidence indicator
+        # Gain prediction indicator
         st.markdown("""
         <div style="font-size: 12px; color: #00ff00; margin-top: 15px;">
-            <div class="blinking">●</div> PREDICTION ENGINE STATUS: ACTIVE | 
-            CONFIDENCE LEVEL: HIGH | PATTERN RECOGNITION: ENABLED
+            <div class="blinking">●</div> GAIN PREDICTION ENGINE: ACTIVE | 
+            FOCUS: TOMORROW'S HIGHEST % GAINERS | MODE: BUY TODAY, SELL TOMORROW
         </div>
         """, unsafe_allow_html=True)
 
@@ -915,7 +977,7 @@ class RetroTerminal:
         col1, col2, col3 = st.columns([1, 1, 1])
         
         with col1:
-            ticker = st.selectbox("SELECT TICKER", self.sp500_tickers, index=0)
+            ticker = st.selectbox("SELECT TICKER", self.all_tickers[:50], index=0)  # Show first 50 for performance
         
         with col2:
             if st.button("ANALYZE", use_container_width=True):
