@@ -45,29 +45,29 @@ class RetroTerminal:
             # High-Growth Tech
             'AVGO', 'ORCL', 'CRM', 'INTC', 'AMD', 'QCOM', 'TXN', 'INTU', 'AMAT', 'MU',
             # Biotech & Healthcare
-            'GILD', 'AMGN', 'VRTX', 'BIIB', 'REGN', 'MRNA', 'BNTX', 'ILMN', 'ALNY', 'SGEN',
+            'GILD', 'AMGN', 'VRTX', 'BIIB', 'REGN', 'MRNA', 'BNTX', 'ILMN', 'ALNY',
             # Emerging Growth
-            'ROKU', 'ZOOM', 'DOCU', 'OKTA', 'SNOW', 'PLTR', 'RBLX', 'U', 'DDOG', 'CRWD',
+            'ROKU', 'ZM', 'DOCU', 'OKTA', 'SNOW', 'PLTR', 'RBLX', 'DDOG', 'CRWD',
             # Consumer & Retail
-            'COST', 'SBUX', 'LULU', 'NKLA', 'LCID', 'RIVN', 'ABNB', 'UBER', 'LYFT', 'DASH',
+            'COST', 'SBUX', 'LULU', 'LCID', 'RIVN', 'ABNB', 'UBER', 'LYFT', 'DASH',
             # Semiconductors
             'ASML', 'LRCX', 'KLAC', 'MRVL', 'MCHP', 'ADI', 'NXPI', 'SWKS', 'QRVO', 'MPWR',
             # Cloud & Software
-            'TEAM', 'WDAY', 'NOW', 'VEEV', 'SPLK', 'SHOP', 'SQ', 'PYPL', 'ZM', 'PTON',
+            'TEAM', 'WDAY', 'NOW', 'VEEV', 'SHOP', 'PYPL', 'PTON',
             # Growth Stocks
             'TTD', 'TWLO', 'PINS', 'SNAP', 'HOOD', 'COIN', 'MELI', 'BABA', 'JD', 'PDD',
             # High-Volatility Opportunities
-            'SPCE', 'WISH', 'CLOV', 'AMC', 'GME', 'BB', 'NOK', 'SNDL', 'TLRY', 'CGC',
+            'SPCE', 'CLOV', 'AMC', 'GME', 'BB', 'NOK', 'SNDL', 'TLRY', 'CGC',
             # Small-Mid Cap Growth
-            'FVRR', 'UPWK', 'ETSY', 'CHWY', 'TDOC', 'PTON', 'BYND', 'ZI', 'FSLY', 'NET',
-            # Recent IPOs & SPACs
-            'RIVN', 'LCID', 'SOFI', 'OPEN', 'WISH', 'GOEV', 'NKLA', 'HYLN', 'QS', 'RIDE'
+            'FVRR', 'UPWK', 'ETSY', 'CHWY', 'TDOC', 'BYND', 'FSLY', 'NET',
+            # Recent IPOs & Clean Tickers
+            'SOFI', 'OPEN', 'GOEV', 'HYLN', 'QS'
         ]
         
-        # Additional high-volatility NASDAQ stocks for gain opportunities
+        # Additional high-volatility NASDAQ stocks for gain opportunities (cleaned)
         self.high_vol_nasdaq = [
             'SOXL', 'TQQQ', 'UPRO', 'SPXL', 'TECL', 'WEBL', 'FNGU', 'CURE', 'LABU', 'ARKK',
-            'ARKG', 'ARKF', 'ARKW', 'ICLN', 'CLOU', 'BLOK', 'FINX', 'ROBO', 'MOON', 'UFO'
+            'ARKG', 'ARKF', 'ARKW', 'ICLN', 'CLOU', 'BLOK', 'FINX', 'ROBO'  # Removed delisted tickers
         ]
         
         # Combine all tickers for maximum coverage
@@ -304,12 +304,25 @@ class RetroTerminal:
             hist = stock.history(period="30d", interval="1d")
             if hist.empty:
                 return None
+            
+            # Skip stocks with insufficient data
+            if len(hist) < 10:
+                return None
                 
             current_price = hist['Close'].iloc[-1]
+            
+            # Skip penny stocks and extremely high-priced stocks
+            if current_price < 1.0 or current_price > 5000:
+                return None
+                
             prev_price = hist['Close'].iloc[-2] if len(hist) > 1 else current_price
             
             # Get additional data
             info = stock.info
+            
+            # Skip if no valid market data
+            if not info or info.get('regularMarketPrice') is None:
+                return None
             
             # Calculate basic metrics
             price_change = current_price - prev_price
@@ -710,7 +723,7 @@ class RetroTerminal:
             import random
             random.shuffle(available_tickers)
             
-            with ThreadPoolExecutor(max_workers=15) as executor:
+            with ThreadPoolExecutor(max_workers=8) as executor:  # Reduced for stability
                 futures = {executor.submit(self.fetch_ticker_data, ticker): ticker for ticker in available_tickers}
                 
                 for i, future in enumerate(futures):
@@ -719,10 +732,13 @@ class RetroTerminal:
                     status_text.text(f"SCANNING NASDAQ: {futures[future]} ({i+1}/{len(futures)})")
                     
                     try:
-                        result = future.result(timeout=5)
+                        result = future.result(timeout=10)  # Increased timeout
                         if result and result.get('tomorrow_gain_score', 0) > 0:
                             results.append(result)
-                    except:
+                    except Exception as e:
+                        # Gracefully handle errors (especially delisted stocks)
+                        if "delisted" not in str(e).lower():
+                            print(f"⚠️  Error with {futures[future]}: {str(e)[:50]}...")
                         continue
             
             # Filter for high-gain potential stocks and ensure variety
