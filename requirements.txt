@@ -8,3 +8,4 @@ streamlit>=1.32
 scikit-learn>=1.3
 pytest>=7.4
 tenacity>=8.2
+seaborn>=0.12
