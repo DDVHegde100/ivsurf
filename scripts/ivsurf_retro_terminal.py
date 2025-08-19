@@ -1470,6 +1470,26 @@ class RetroTerminal:
         
         final_confidence = min(95, base_confidence * confidence_adj)
         
+        # === ENHANCED GAIN CATEGORIZATION SYSTEM ===
+        
+        # 1. ADVANCED Expected Return Categories with Mathematical Precision
+        expected_categories = self._categorize_expected_returns(
+            expected_gain_pct, percentile_75_gain, percentile_90_gain, 
+            gain_prediction_score, volatility
+        )
+        
+        # 2. SOPHISTICATED Risk-Adjusted Performance Metrics
+        risk_metrics = self._calculate_advanced_risk_metrics(
+            positive_gains if 'positive_gains' in locals() else None,
+            volatility, current_price, gain_prediction_score
+        )
+        
+        # 3. PROBABILITY-WEIGHTED Target Calculations
+        probability_targets = self._calculate_probability_weighted_targets(
+            current_price, expected_gain_pct, median_gain_pct, 
+            percentile_75_gain, percentile_90_gain, prob_positive
+        )
+        
         return {
             'current_price': current_price,
             'expected_gain_pct': expected_gain_pct,
@@ -1479,7 +1499,139 @@ class RetroTerminal:
             'aggressive_target': aggressive_target,
             'probability_positive': prob_positive,
             'confidence_level': final_confidence,
-            'risk_reward_ratio': percentile_75_gain / max(0.5, volatility * 100 / np.sqrt(252))
+            'risk_reward_ratio': percentile_75_gain / max(0.5, volatility * 100 / np.sqrt(252)),
+            
+            # NEW: Enhanced categorization data
+            'expected_category': expected_categories['category'],
+            'expected_low': expected_categories['expected_low'],
+            'expected_medium': expected_categories['expected_medium'], 
+            'expected_high': expected_categories['expected_high'],
+            'average_gain_pct': expected_categories['average_gain_pct'],
+            'gain_distribution': expected_categories['gain_distribution'],
+            
+            # NEW: Advanced risk metrics
+            'sharpe_estimate': risk_metrics['sharpe_estimate'],
+            'max_drawdown_risk': risk_metrics['max_drawdown_risk'],
+            'value_at_risk_5pct': risk_metrics['value_at_risk_5pct'],
+            'expected_shortfall': risk_metrics['expected_shortfall'],
+            'profit_factor': risk_metrics['profit_factor'],
+            
+            # NEW: Probability-weighted targets
+            'prob_weighted_low': probability_targets['prob_weighted_low'],
+            'prob_weighted_medium': probability_targets['prob_weighted_medium'],
+            'prob_weighted_high': probability_targets['prob_weighted_high'],
+            'optimal_entry_price': probability_targets['optimal_entry_price'],
+            'stop_loss_level': probability_targets['stop_loss_level']
+        }
+    
+    def _categorize_expected_returns(self, expected_gain_pct, p75_gain, p90_gain, prediction_score, volatility):
+        """Advanced mathematical categorization of expected returns"""
+        
+        # Volatility-adjusted expected returns
+        vol_adjustment = min(1.5, max(0.7, 1 + (volatility - 0.3) * 0.5))
+        
+        # Calculate sophisticated gain categories
+        base_low = expected_gain_pct * 0.6 * vol_adjustment
+        base_medium = expected_gain_pct * vol_adjustment  
+        base_high = p75_gain * vol_adjustment
+        
+        # Prediction score enhancement
+        score_multiplier = 1 + (prediction_score - 60) / 200  # Scale from prediction confidence
+        
+        expected_low = base_low * score_multiplier
+        expected_medium = base_medium * score_multiplier
+        expected_high = base_high * score_multiplier
+        
+        # Determine primary category based on statistical analysis
+        if expected_high > 3.0 and prediction_score > 80:
+            category = "EXPECTED HIGH"
+        elif expected_medium > 1.5 and prediction_score > 65:
+            category = "EXPECTED MEDIUM"
+        elif expected_low > 0.8 and prediction_score > 50:
+            category = "EXPECTED LOW"
+        else:
+            category = "SPECULATIVE"
+        
+        # Calculate weighted average gain
+        weights = [0.3, 0.5, 0.2]  # Low, Medium, High probability weights
+        average_gain_pct = (expected_low * weights[0] + 
+                           expected_medium * weights[1] + 
+                           expected_high * weights[2])
+        
+        # Gain distribution analysis
+        gain_distribution = {
+            'skewness': (expected_high - expected_low) / expected_medium if expected_medium > 0 else 0,
+            'kurtosis': prediction_score / 25,  # Higher scores = more peaked distribution
+            'spread': expected_high - expected_low
+        }
+        
+        return {
+            'category': category,
+            'expected_low': round(expected_low, 2),
+            'expected_medium': round(expected_medium, 2),
+            'expected_high': round(expected_high, 2),
+            'average_gain_pct': round(average_gain_pct, 2),
+            'gain_distribution': gain_distribution
+        }
+    
+    def _calculate_advanced_risk_metrics(self, positive_gains, volatility, current_price, prediction_score):
+        """Calculate sophisticated risk-adjusted performance metrics"""
+        
+        # Sharpe ratio estimate
+        excess_return = (prediction_score - 50) / 100 * 0.1  # Convert score to excess return estimate
+        sharpe_estimate = excess_return / volatility if volatility > 0 else 0
+        
+        # Maximum drawdown risk estimation
+        max_drawdown_risk = min(25, volatility * 100 * 0.8)  # Estimate based on volatility
+        
+        # Value at Risk (5% worst case)
+        daily_vol = volatility / np.sqrt(252)
+        var_5pct = current_price * daily_vol * 1.645  # 5% VaR (1.645 is 95th percentile)
+        
+        # Expected Shortfall (average loss beyond VaR)
+        expected_shortfall = var_5pct * 1.3  # Conservative estimate
+        
+        # Profit Factor approximation
+        if positive_gains is not None and len(positive_gains) > 0:
+            avg_positive = np.mean(positive_gains)
+            profit_factor = avg_positive / (volatility * 0.01) if volatility > 0 else 1
+        else:
+            profit_factor = prediction_score / 50  # Score-based estimate
+        
+        return {
+            'sharpe_estimate': round(sharpe_estimate, 3),
+            'max_drawdown_risk': round(max_drawdown_risk, 2),
+            'value_at_risk_5pct': round(var_5pct, 2),
+            'expected_shortfall': round(expected_shortfall, 2),
+            'profit_factor': round(profit_factor, 2)
+        }
+    
+    def _calculate_probability_weighted_targets(self, current_price, expected_gain, median_gain, 
+                                               p75_gain, p90_gain, prob_positive):
+        """Calculate probability-weighted target prices and risk levels"""
+        
+        # Probability weights based on confidence
+        prob_factor = prob_positive / 100
+        
+        # Probability-weighted targets
+        prob_weighted_low = current_price * (1 + (expected_gain * 0.5 * prob_factor) / 100)
+        prob_weighted_medium = current_price * (1 + (median_gain * prob_factor) / 100)
+        prob_weighted_high = current_price * (1 + (p75_gain * prob_factor) / 100)
+        
+        # Optimal entry price (slight discount for better risk/reward)
+        entry_discount = 0.5 if prob_positive > 70 else 1.0
+        optimal_entry_price = current_price * (1 - entry_discount / 100)
+        
+        # Dynamic stop loss based on volatility and confidence
+        stop_loss_pct = max(2, min(8, (100 - prob_positive) / 10))  # 2-8% based on confidence
+        stop_loss_level = current_price * (1 - stop_loss_pct / 100)
+        
+        return {
+            'prob_weighted_low': round(prob_weighted_low, 2),
+            'prob_weighted_medium': round(prob_weighted_medium, 2),
+            'prob_weighted_high': round(prob_weighted_high, 2),
+            'optimal_entry_price': round(optimal_entry_price, 2),
+            'stop_loss_level': round(stop_loss_level, 2)
         }
 
     def scan_all_tickers(self):
@@ -1534,7 +1686,7 @@ class RetroTerminal:
                 
                 # Update previous winners to ensure fresh picks next time
                 top_gainers = results_df.nlargest(20, 'tomorrow_gain_score')['ticker'].tolist()
-                self.previous_winners.update(top_gainers[:10])  # Remember top 10
+                self.previous_winners.update(top_gainers[:20])  # Remember top 20
             
             progress_bar.empty()
             status_text.empty()
@@ -1626,8 +1778,8 @@ class RetroTerminal:
         ]
         
         # 2. Tomorrow's predicted winners (MAIN FOCUS - fresh opportunities)
-        tomorrow_gains = df.nlargest(10, 'tomorrow_gain_score')[
-            ['ticker', 'price', 'expected_gain_pct', 'probability_positive', 'confidence_level', 'conservative_target', 'tomorrow_gain_score']
+        tomorrow_gains = df.nlargest(20, 'tomorrow_gain_score')[
+            ['ticker', 'price', 'expected_gain_pct', 'probability_positive', 'confidence_level', 'conservative_target', 'tomorrow_gain_score', 'gain_category', 'avg_expected_gain']
         ]
         
         # 3. Yesterday's options plays
@@ -1664,7 +1816,7 @@ class RetroTerminal:
             st.markdown("""
             <div class="terminal-box">
                 <div class="terminal-prompt">
-                    HISTORICAL PERFORMANCE | TOP 10 SWING TRADES
+                    HISTORICAL PERFORMANCE | TOP 20 SWING TRADES
                 </div>
                 <div style="color: #ffff88; font-size: 12px; margin-top: 8px;">
                     Stocks that delivered the highest swing profits yesterday
@@ -1702,13 +1854,13 @@ class RetroTerminal:
             st.markdown("""
             <div class="terminal-box">
                 <div class="terminal-prompt">
-                    TOMORROW'S PREDICTED WINNERS | FRESH OPPORTUNITIES
+                    TOMORROW'S PREDICTED WINNERS | FRESH OPPORTUNITIES | TOP 20
                 </div>
                 <div style="color: #ffff00; font-size: 12px; margin-top: 8px;">
                     NEW STOCKS: Different from yesterday's winners, highest % gain potential
                 </div>
                 <div style="color: #88ff88; font-size: 11px; margin-top: 5px;">
-                    Buy Today, Sell Tomorrow Strategy | Elite Quant Algorithms
+                    Buy Today, Sell Tomorrow Strategy | Elite Quant Algorithms | Enhanced Categorization
                 </div>
             </div>
             """, unsafe_allow_html=True)
@@ -1720,16 +1872,20 @@ class RetroTerminal:
                 lambda x: f"<span class='profit-high'>+{x:.2f}%</span>"
             )
             tomorrow_gains_display['TARGET'] = tomorrow_gains_display['conservative_target'].apply(lambda x: f"${x:.2f}")
+            tomorrow_gains_display['CATEGORY'] = tomorrow_gains_display['gain_category']
             tomorrow_gains_display['WIN_PROB'] = tomorrow_gains_display['probability_positive'].apply(
                 lambda x: f"<span class='profit-medium'>{x:.0f}%</span>" if x > 70 else f"{x:.0f}%"
             )
             tomorrow_gains_display['CONFIDENCE'] = tomorrow_gains_display['confidence_level'].apply(
                 lambda x: f"<span class='profit-high'>{x:.0f}%</span>" if x > 80 else f"<span class='profit-medium'>{x:.0f}%</span>"
             )
+            tomorrow_gains_display['AVG_GAIN'] = tomorrow_gains_display['avg_expected_gain'].apply(
+                lambda x: f"<span class='profit-high'>+{x:.1f}%</span>" if x > 0 else f"{x:.1f}%"
+            )
             tomorrow_gains_display['SCORE'] = tomorrow_gains_display['tomorrow_gain_score'].apply(lambda x: f"{x:.0f}")
             
-            tomorrow_gains_display = tomorrow_gains_display[['ticker', 'CURRENT', 'PREDICTED', 'TARGET', 'WIN_PROB', 'CONFIDENCE', 'SCORE']]
-            tomorrow_gains_display.columns = ['TICKER', 'CURRENT', 'PREDICTED', 'TARGET', 'WIN PROB', 'CONFIDENCE', 'GAIN SCORE']
+            tomorrow_gains_display = tomorrow_gains_display[['ticker', 'CURRENT', 'PREDICTED', 'TARGET', 'CATEGORY', 'WIN_PROB', 'CONFIDENCE', 'AVG_GAIN', 'SCORE']]
+            tomorrow_gains_display.columns = ['TICKER', 'CURRENT', 'PREDICTED', 'TARGET', 'CATEGORY', 'WIN PROB', 'CONFIDENCE', 'AVG GAIN', 'GAIN SCORE']
             
             st.dataframe(tomorrow_gains_display, use_container_width=True, hide_index=True)
             
