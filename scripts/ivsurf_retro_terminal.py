@@ -1046,6 +1046,118 @@ class RetroTerminal:
             pattern_score * 0.005             # Patterns
         )
         
+        # === ADVANCED VOLATILITY MODELING & RISK METRICS ===
+        
+        # 1. GARCH-style Volatility Clustering Analysis
+        volatility_clustering_score = 0
+        if len(hist) >= 30:
+            returns = hist['Close'].pct_change().dropna().tail(30)
+            squared_returns = returns ** 2
+            
+            # Volatility clustering detection
+            vol_autocorr = np.corrcoef(squared_returns[:-1], squared_returns[1:])[0,1]
+            if not np.isnan(vol_autocorr) and vol_autocorr > 0.3:
+                clustering_strength = min(1.0, vol_autocorr)
+                volatility_clustering_score = clustering_strength * 25
+        
+        # 2. ADVANCED Black-Scholes Greeks Analysis for Directional Bias
+        greeks_momentum_score = 0
+        try:
+            # Estimate option deltas for different strikes
+            time_to_expiry = 1/365  # Tomorrow
+            risk_free_rate = 0.05
+            
+            # Calculate theoretical call deltas for various strikes
+            strikes = [current_price * 0.95, current_price, current_price * 1.05]
+            call_deltas = []
+            
+            for strike in strikes:
+                d1 = (np.log(current_price / strike) + (risk_free_rate + 0.5 * volatility**2) * time_to_expiry) / (volatility * np.sqrt(time_to_expiry))
+                delta = norm.cdf(d1)
+                call_deltas.append(delta)
+            
+            # Delta smile analysis - convexity indicates direction
+            if len(call_deltas) == 3:
+                delta_convexity = call_deltas[0] + call_deltas[2] - 2 * call_deltas[1]
+                if delta_convexity > 0 and momentum_1d > 0:  # Positive convexity + momentum
+                    greeks_momentum_score = abs(delta_convexity) * 100
+        except:
+            pass
+        
+        # 3. SOPHISTICATED Risk-Adjusted Return Expectation
+        risk_adjusted_score = 0
+        if len(hist) >= 20:
+            returns = hist['Close'].pct_change().dropna().tail(20)
+            
+            # Sharpe ratio calculation
+            excess_returns = returns - 0.05/252  # Risk-free rate daily
+            sharpe_ratio = excess_returns.mean() / excess_returns.std() if excess_returns.std() > 0 else 0
+            
+            # Sortino ratio (downside deviation)
+            downside_returns = returns[returns < 0]
+            downside_std = downside_returns.std() if len(downside_returns) > 0 else returns.std()
+            sortino_ratio = excess_returns.mean() / downside_std if downside_std > 0 else 0
+            
+            # Calmar ratio approximation
+            max_drawdown = 0
+            peak = hist['Close'].iloc[0]
+            for price in hist['Close']:
+                if price > peak:
+                    peak = price
+                drawdown = (peak - price) / peak
+                max_drawdown = max(max_drawdown, drawdown)
+            
+            calmar_ratio = (returns.mean() * 252) / max_drawdown if max_drawdown > 0 else 0
+            
+            # Combined risk-adjusted score
+            if sharpe_ratio > 0.5 and sortino_ratio > 0.7:
+                risk_adjusted_score = min(30, (sharpe_ratio + sortino_ratio + calmar_ratio) * 10)
+        
+        # 4. HESTON Model Implied Volatility Surface Analysis
+        heston_score = 0
+        try:
+            # Simplified Heston parameter estimation
+            if len(hist) >= 50:
+                returns = hist['Close'].pct_change().dropna()
+                vol_of_vol = returns.rolling(10).std().std()  # Volatility of volatility
+                mean_reversion_speed = abs(returns.autocorr(lag=1))  # Mean reversion proxy
+                
+                # Heston smile prediction
+                if vol_of_vol > 0.01 and mean_reversion_speed > 0.1:
+                    heston_complexity = vol_of_vol * mean_reversion_speed * 1000
+                    if volatility > 0.3:  # High base volatility
+                        heston_score = min(25, heston_complexity)
+        except:
+            pass
+        
+        # 5. JUMP DIFFUSION Detection (Merton Model)
+        jump_detection_score = 0
+        if len(hist) >= 30:
+            returns = hist['Close'].pct_change().dropna()
+            
+            # Detect jumps using statistical methods
+            return_threshold = returns.std() * 3  # 3-sigma events
+            jumps = returns[abs(returns) > return_threshold]
+            
+            if len(jumps) > 0:
+                recent_jumps = returns.tail(5)
+                positive_jumps = sum(1 for r in recent_jumps if r > return_threshold)
+                
+                if positive_jumps >= 1:  # Recent positive jump
+                    jump_intensity = len(jumps) / len(returns)
+                    jump_detection_score = min(20, jump_intensity * 200)
+        
+        # Update total score with advanced volatility metrics
+        volatility_enhancement = (
+            volatility_clustering_score * 0.25 +
+            greeks_momentum_score * 0.30 +
+            risk_adjusted_score * 0.25 +
+            heston_score * 0.15 +
+            jump_detection_score * 0.05
+        )
+        
+        total_bullish_score += volatility_enhancement
+        
         # === RISK ADJUSTMENT ===
         # Penalize very high volatility (too risky)
         if volatility > 0.8:
