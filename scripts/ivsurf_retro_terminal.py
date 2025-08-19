@@ -1171,11 +1171,222 @@ class RetroTerminal:
         if rsi > 75:
             total_bullish_score *= 0.6
         
-        # === CONFIDENCE WEIGHTING ===
-        data_quality = min(len(hist) / 30, 1.0)  # More data = higher confidence
-        final_score = total_bullish_score * data_quality
+        # === ULTRA-SOPHISTICATED QUANTITATIVE ALGORITHMS ===
         
-        return max(0, min(100, final_score))
+        # 1. MACHINE LEARNING-INSPIRED Pattern Recognition
+        ml_pattern_score = 0
+        if len(hist) >= 50:
+            # Feature engineering for pattern recognition
+            features = []
+            prices = hist['Close'].tail(50).values
+            volumes = hist['Volume'].tail(50).values
+            
+            # Technical features
+            for window in [5, 10, 20]:
+                if len(prices) >= window:
+                    sma = np.mean(prices[-window:])
+                    price_to_sma = current_price / sma
+                    features.append(price_to_sma)
+                    
+                    # Volume-price correlation
+                    if len(volumes) >= window:
+                        vol_price_corr = np.corrcoef(prices[-window:], volumes[-window:])[0,1]
+                        if not np.isnan(vol_price_corr):
+                            features.append(vol_price_corr)
+            
+            # Pattern scoring based on feature combinations
+            if len(features) >= 6:
+                # Bull flag pattern approximation
+                short_trend = features[0]  # Price to 5-day SMA
+                medium_trend = features[1]  # Price to 10-day SMA
+                long_trend = features[2]   # Price to 20-day SMA
+                
+                if short_trend > 1.02 and medium_trend > 1.01 and long_trend > 1.005:
+                    ml_pattern_score = 25
+                elif short_trend > 1.01 and medium_trend > 1.005:
+                    ml_pattern_score = 15
+        
+        # 2. FRACTAL ANALYSIS for Multi-Timeframe Confluence
+        fractal_score = 0
+        if len(hist) >= 60:
+            # Analyze multiple timeframes for fractal patterns
+            timeframes = [5, 15, 30]  # Short, medium, long-term
+            fractal_signals = []
+            
+            for tf in timeframes:
+                if len(hist) >= tf:
+                    tf_data = hist.tail(tf)
+                    highs = tf_data['High'].values
+                    lows = tf_data['Low'].values
+                    
+                    # Find local maxima and minima
+                    try:
+                        high_peaks, _ = find_peaks(highs)
+                        low_peaks, _ = find_peaks(-lows)
+                        
+                        # Fractal breakout detection
+                        if len(high_peaks) > 0:
+                            last_high_peak = highs[high_peaks[-1]] if len(high_peaks) > 0 else highs[0]
+                            if current_price > last_high_peak * 1.001:  # Breaking above fractal
+                                fractal_signals.append(1)
+                            else:
+                                fractal_signals.append(0)
+                        else:
+                            fractal_signals.append(0)
+                    except:
+                        fractal_signals.append(0)
+            
+            # Multi-timeframe confluence
+            confluence_strength = sum(fractal_signals) / len(fractal_signals)
+            fractal_score = confluence_strength * 30
+        
+        # 3. KELLY CRITERION for Optimal Position Sizing Signal
+        kelly_score = 0
+        if len(hist) >= 30:
+            returns = hist['Close'].pct_change().dropna().tail(30)
+            positive_returns = returns[returns > 0]
+            negative_returns = returns[returns < 0]
+            
+            if len(positive_returns) > 0 and len(negative_returns) > 0:
+                win_rate = len(positive_returns) / len(returns)
+                avg_win = positive_returns.mean()
+                avg_loss = abs(negative_returns.mean())
+                
+                if avg_loss > 0 and win_rate > 0.5:
+                    # Kelly Criterion: f = (bp - q) / b
+                    # where b = avg_win/avg_loss, p = win_rate, q = 1-win_rate
+                    b = avg_win / avg_loss
+                    kelly_fraction = (b * win_rate - (1 - win_rate)) / b
+                    
+                    if kelly_fraction > 0.1:  # Positive edge
+                        kelly_score = min(35, kelly_fraction * 100)
+        
+        # 4. MONTE CARLO VAR-based Confidence Estimation
+        monte_carlo_confidence = 0
+        if len(hist) >= 30:
+            returns = hist['Close'].pct_change().dropna().tail(30)
+            
+            # Monte Carlo simulation for tomorrow's return
+            n_sims = 10000
+            simulated_returns = []
+            
+            # Bootstrap from historical returns
+            np.random.seed(42)
+            for _ in range(n_sims):
+                # Sample with replacement and add momentum bias
+                sampled_return = np.random.choice(returns)
+                momentum_bias = (momentum_1d + momentum_3d) / 200  # Small momentum adjustment
+                adjusted_return = sampled_return + momentum_bias
+                simulated_returns.append(adjusted_return)
+            
+            simulated_returns = np.array(simulated_returns)
+            
+            # Value at Risk analysis
+            var_95 = np.percentile(simulated_returns, 5)  # 5th percentile (worst case)
+            var_99 = np.percentile(simulated_returns, 1)  # 1st percentile (extreme worst case)
+            expected_return = np.mean(simulated_returns)
+            
+            # Confidence based on upside vs downside
+            upside_potential = np.percentile(simulated_returns, 95)
+            probability_positive = np.mean(simulated_returns > 0)
+            
+            if probability_positive > 0.6 and expected_return > 0:
+                risk_reward = upside_potential / abs(var_95) if var_95 < 0 else upside_potential
+                monte_carlo_confidence = min(40, risk_reward * probability_positive * 50)
+        
+        # 5. INFORMATION THEORY-based Entropy Analysis
+        entropy_score = 0
+        if len(hist) >= 40:
+            # Price movement entropy calculation
+            returns = hist['Close'].pct_change().dropna().tail(40)
+            
+            # Discretize returns into bins
+            bins = 10
+            hist_counts, _ = np.histogram(returns, bins=bins)
+            probs = hist_counts / len(returns)
+            probs = probs[probs > 0]  # Remove zero probabilities
+            
+            # Calculate Shannon entropy
+            entropy = -np.sum(probs * np.log2(probs))
+            max_entropy = np.log2(bins)
+            normalized_entropy = entropy / max_entropy
+            
+            # Low entropy (more predictable) with positive momentum is bullish
+            if normalized_entropy < 0.7 and momentum_1d > 0:
+                predictability_score = (0.7 - normalized_entropy) * 50
+                entropy_score = min(25, predictability_score)
+        
+        # 6. WAVELET ANALYSIS for Trend Decomposition
+        wavelet_score = 0
+        if len(hist) >= 64:  # Need power of 2 for efficient wavelet transform
+            try:
+                prices = hist['Close'].tail(64).values
+                # Simple moving average as trend approximation (wavelet substitute)
+                
+                # Multi-resolution analysis simulation
+                scales = [4, 8, 16, 32]
+                trend_signals = []
+                
+                for scale in scales:
+                    if len(prices) >= scale:
+                        smooth_trend = np.convolve(prices, np.ones(scale)/scale, mode='valid')
+                        if len(smooth_trend) >= 2:
+                            trend_direction = smooth_trend[-1] - smooth_trend[-2]
+                            trend_signals.append(1 if trend_direction > 0 else 0)
+                
+                # Multi-scale trend confluence
+                if len(trend_signals) > 0:
+                    trend_consensus = sum(trend_signals) / len(trend_signals)
+                    if trend_consensus >= 0.75:  # 75% of scales agree on uptrend
+                        wavelet_score = 20
+                    elif trend_consensus >= 0.5:
+                        wavelet_score = 10
+            except:
+                pass
+        
+        # === FINAL QUANTITATIVE SCORE INTEGRATION ===
+        quant_enhancement = (
+            ml_pattern_score * 0.25 +
+            fractal_score * 0.20 +
+            kelly_score * 0.20 +
+            monte_carlo_confidence * 0.15 +
+            entropy_score * 0.10 +
+            wavelet_score * 0.10
+        )
+        
+        total_bullish_score += quant_enhancement
+        
+        # === ENHANCED CONFIDENCE WEIGHTING ===
+        
+        # Multi-factor confidence calculation
+        data_quality = min(len(hist) / 50, 1.0)  # More data required for high confidence
+        volume_quality = min(volume_trend / 1.5, 1.0)  # Volume confirmation
+        momentum_consistency = 1.0
+        
+        # Check momentum consistency across timeframes
+        if momentum_1d * momentum_3d > 0 and momentum_3d * momentum_5d > 0:
+            momentum_consistency = 1.2  # All timeframes agree
+        elif momentum_1d * momentum_3d < 0:
+            momentum_consistency = 0.8  # Conflicting signals
+        
+        # Volatility regime confidence
+        volatility_confidence = 1.0
+        if 0.2 <= volatility <= 0.6:  # Optimal volatility range
+            volatility_confidence = 1.1
+        elif volatility > 0.8:  # Too volatile
+            volatility_confidence = 0.7
+        
+        # Statistical significance confidence
+        statistical_confidence = min(total_bullish_score / 50, 1.2)  # Higher scores get more confidence
+        
+        # Combined confidence multiplier
+        confidence_multiplier = (data_quality * volume_quality * momentum_consistency * 
+                               volatility_confidence * statistical_confidence)
+        
+        final_score = total_bullish_score * confidence_multiplier
+        
+        # Ensure score is within bounds but allow for exceptional cases
+        return max(0, min(120, final_score))  # Allow scores up to 120 for exceptional opportunities
     
     def calculate_tomorrow_gain_potential(self, hist, current_price, volatility, gain_prediction_score):
         """
