@@ -49,7 +49,11 @@ def calculate_rsi(prices: np.ndarray, window: int = 14) -> np.ndarray:
     avg_losses = pd.Series(losses).rolling(window=window).mean().values
     
     rs = avg_gains / (avg_losses + 1e-10)
-    rsi = 100 - (100 / (1 + rs))
+    rsi_values = 100 - (100 / (1 + rs))
+    
+    # Pad with NaN to match original length
+    rsi = np.full(len(prices), np.nan)
+    rsi[1:] = rsi_values
     
     return rsi
 
@@ -65,8 +69,9 @@ def calculate_bollinger_bands(prices: np.ndarray, window: int = 20, num_std: flo
 
 def calculate_macd(prices: np.ndarray, fast: int = 12, slow: int = 26, signal: int = 9) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Calculate MACD indicator"""
-    ema_fast = pd.Series(prices).ewm(span=fast).mean().values
-    ema_slow = pd.Series(prices).ewm(span=slow).mean().values
+    price_series = pd.Series(prices)
+    ema_fast = price_series.ewm(span=fast).mean().values
+    ema_slow = price_series.ewm(span=slow).mean().values
     
     macd_line = ema_fast - ema_slow
     signal_line = pd.Series(macd_line).ewm(span=signal).mean().values
@@ -79,6 +84,10 @@ def calculate_atr(high: np.ndarray, low: np.ndarray, close: np.ndarray, window: 
     tr1 = high - low
     tr2 = np.abs(high - np.roll(close, 1))
     tr3 = np.abs(low - np.roll(close, 1))
+    
+    # Set first value to high-low since no previous close
+    tr2[0] = high[0] - low[0] 
+    tr3[0] = high[0] - low[0]
     
     true_range = np.maximum(tr1, np.maximum(tr2, tr3))
     atr = pd.Series(true_range).rolling(window=window).mean().values
@@ -130,6 +139,65 @@ class TechnicalFeatureEngineer:
         self.feature_names = []
         self.scaler = None
     
+    def create_features(self, data: pd.DataFrame, selected_features: List[str] = None) -> pd.DataFrame:
+        """
+        Create comprehensive feature set for ML models
+        
+        Args:
+            data: DataFrame with OHLCV data
+            selected_features: List of feature types to include
+            
+        Returns:
+            DataFrame with engineered features
+        """
+        if selected_features is None:
+            selected_features = ['RSI', 'MACD', 'ATR', 'Bollinger Bands', 'Price Returns', 'Volatility Clustering']
+        
+        # Start with price features
+        features = self.create_price_features(data)
+        
+        # Add technical indicators based on selection
+        if 'RSI' in selected_features:
+            rsi_features = self.create_rsi_features(data)
+            features = pd.concat([features, rsi_features], axis=1)
+        
+        if 'MACD' in selected_features:
+            macd_features = self.create_macd_features(data)
+            features = pd.concat([features, macd_features], axis=1)
+        
+        if 'ATR' in selected_features:
+            atr_features = self.create_atr_features(data)
+            features = pd.concat([features, atr_features], axis=1)
+        
+        if 'Bollinger Bands' in selected_features:
+            bb_features = self.create_bollinger_features(data)
+            features = pd.concat([features, bb_features], axis=1)
+        
+        if 'Volatility Clustering' in selected_features:
+            vol_features = self.create_volatility_features(data)
+            features = pd.concat([features, vol_features], axis=1)
+        
+        # Volume features if available
+        if 'Volume' in data.columns:
+            volume_features = self.create_volume_features(data)
+            features = pd.concat([features, volume_features], axis=1)
+        
+        # Market microstructure features
+        micro_features = self.create_microstructure_features(data)
+        features = pd.concat([features, micro_features], axis=1)
+        
+        # Lag features
+        lag_features = self.create_lag_features(features)
+        features = pd.concat([features, lag_features], axis=1)
+        
+        # Store feature names
+        self.feature_names = features.columns.tolist()
+        
+        # Drop NaN values
+        features = features.dropna()
+        
+        return features
+
     def create_price_features(self, data: pd.DataFrame) -> pd.DataFrame:
         """
         Create price-based features
@@ -212,6 +280,152 @@ class TechnicalFeatureEngineer:
         
         return features
     
+    def create_rsi_features(self, data: pd.DataFrame) -> pd.DataFrame:
+        """Create RSI-based features"""
+        features = pd.DataFrame(index=data.index)
+        prices = data['Close'].values
+        
+        # RSI with different periods
+        for period in [14, 21, 50]:
+            rsi = calculate_rsi(prices, window=period)
+            rsi_series = pd.Series(rsi, index=data.index)
+            
+            features[f'rsi_{period}'] = rsi_series
+            features[f'rsi_{period}_oversold'] = (rsi_series < 30).astype(int)
+            features[f'rsi_{period}_overbought'] = (rsi_series > 70).astype(int)
+            features[f'rsi_{period}_momentum'] = rsi_series - rsi_series.shift(5)  # 5-day momentum
+        
+        return features
+    
+    def create_macd_features(self, data: pd.DataFrame) -> pd.DataFrame:
+        """Create MACD-based features"""
+        features = pd.DataFrame(index=data.index)
+        prices = data['Close'].values
+        
+        # MACD with different parameters
+        for fast, slow, signal in [(12, 26, 9), (5, 35, 5)]:
+            macd_line, signal_line, histogram = calculate_macd(prices, fast, slow, signal)
+            suffix = f"_{fast}_{slow}_{signal}"
+            
+            macd_series = pd.Series(macd_line, index=data.index)
+            signal_series = pd.Series(signal_line, index=data.index)
+            histogram_series = pd.Series(histogram, index=data.index)
+            
+            features[f'macd{suffix}'] = macd_series
+            features[f'macd_signal{suffix}'] = signal_series
+            features[f'macd_histogram{suffix}'] = histogram_series
+            features[f'macd_cross{suffix}'] = (macd_series > signal_series).astype(int)
+            features[f'macd_divergence{suffix}'] = macd_series - signal_series
+        
+        return features
+    
+    def create_atr_features(self, data: pd.DataFrame) -> pd.DataFrame:
+        """Create ATR-based features"""
+        features = pd.DataFrame(index=data.index)
+        
+        high = data['High'].values
+        low = data['Low'].values
+        close = data['Close'].values
+        
+        # ATR with different periods
+        for period in [14, 21, 50]:
+            atr = calculate_atr(high, low, close, window=period)
+            atr_series = pd.Series(atr, index=data.index)
+            
+            features[f'atr_{period}'] = atr_series
+            features[f'atr_{period}_normalized'] = atr_series / close
+            features[f'atr_{period}_percentile'] = atr_series.rolling(100).rank(pct=True)
+        
+        return features
+    
+    def create_bollinger_features(self, data: pd.DataFrame) -> pd.DataFrame:
+        """Create Bollinger Bands features"""
+        features = pd.DataFrame(index=data.index)
+        prices = data['Close'].values
+        
+        # Bollinger Bands with different parameters
+        for window, std_dev in [(20, 2), (20, 1), (50, 2)]:
+            bb_upper, bb_middle, bb_lower = calculate_bollinger_bands(prices, window, std_dev)
+            suffix = f"_{window}_{std_dev}"
+            
+            features[f'bb_upper{suffix}'] = bb_upper
+            features[f'bb_middle{suffix}'] = bb_middle
+            features[f'bb_lower{suffix}'] = bb_lower
+            features[f'bb_width{suffix}'] = (bb_upper - bb_lower) / bb_middle
+            features[f'bb_position{suffix}'] = (prices - bb_lower) / (bb_upper - bb_lower + 1e-10)
+            features[f'bb_squeeze{suffix}'] = (features[f'bb_width{suffix}'] < features[f'bb_width{suffix}'].rolling(20).quantile(0.2)).astype(int)
+        
+        return features
+    
+    def create_volume_features(self, data: pd.DataFrame) -> pd.DataFrame:
+        """Create volume-based features"""
+        features = pd.DataFrame(index=data.index)
+        
+        if 'Volume' not in data.columns:
+            return features
+        
+        volume = data['Volume']
+        close = data['Close']
+        
+        # Volume indicators
+        for window in [10, 20, 50]:
+            features[f'volume_sma_{window}'] = volume.rolling(window).mean()
+            features[f'volume_ratio_{window}'] = volume / features[f'volume_sma_{window}']
+            features[f'volume_std_{window}'] = volume.rolling(window).std()
+        
+        # Price-volume features
+        features['price_volume'] = close * volume
+        features['vwap_20'] = (close * volume).rolling(20).sum() / volume.rolling(20).sum()
+        features['price_vwap_ratio'] = close / features['vwap_20']
+        
+        # On-Balance Volume
+        features['obv'] = (np.sign(close.pct_change()) * volume).cumsum()
+        features['obv_sma_20'] = features['obv'].rolling(20).mean()
+        
+        return features
+    
+    def create_microstructure_features(self, data: pd.DataFrame) -> pd.DataFrame:
+        """Create market microstructure features"""
+        features = pd.DataFrame(index=data.index)
+        
+        # Price gaps
+        features['gap'] = data['Open'] - data['Close'].shift(1)
+        features['gap_pct'] = features['gap'] / data['Close'].shift(1)
+        features['gap_up'] = (features['gap'] > 0).astype(int)
+        features['gap_down'] = (features['gap'] < 0).astype(int)
+        
+        # Intraday patterns
+        features['intraday_range'] = (data['High'] - data['Low']) / data['Open']
+        features['open_close_ratio'] = data['Close'] / data['Open']
+        features['high_close_ratio'] = data['High'] / data['Close']
+        features['low_close_ratio'] = data['Low'] / data['Close']
+        
+        # Momentum features
+        for period in [1, 3, 5, 10]:
+            features[f'momentum_{period}'] = data['Close'].pct_change(period)
+            features[f'momentum_{period}_positive'] = (features[f'momentum_{period}'] > 0).astype(int)
+        
+        return features
+    
+    def create_lag_features(self, data: pd.DataFrame) -> pd.DataFrame:
+        """Create lagged features"""
+        features = pd.DataFrame(index=data.index)
+        
+        # Select key features for lagging
+        key_features = ['returns', 'log_returns', 'realized_vol_20']
+        if 'rsi_14' in data.columns:
+            key_features.append('rsi_14')
+        if 'macd_12_26_9' in data.columns:
+            key_features.append('macd_12_26_9')
+        
+        # Create lags
+        for feature in key_features:
+            if feature in data.columns:
+                for lag in [1, 2, 3, 5]:
+                    features[f'{feature}_lag_{lag}'] = data[feature].shift(lag)
+        
+        return features
+
     def create_technical_indicators(self, data: pd.DataFrame) -> pd.DataFrame:
         """
         Create technical indicator features
@@ -260,29 +474,6 @@ class TechnicalFeatureEngineer:
             features['atr'] = calculate_atr(data['High'].values, data['Low'].values, prices)
             features['atr_ratio'] = features['atr'] / data['Close']
         
-        return features
-    
-    def create_lag_features(self, target: pd.Series, n_lags: int = 10) -> pd.DataFrame:
-        """
-        Create lagged features
-        
-        Args:
-            target: Target series
-            n_lags: Number of lags to create
-            
-        Returns:
-            DataFrame with lagged features
-        """
-        features = pd.DataFrame(index=target.index)
-        
-        for lag in range(1, n_lags + 1):
-            features[f'lag_{lag}'] = target.shift(lag)
-            
-        # Rolling statistics of lags
-        for window in [3, 5, 10]:
-            features[f'lag_mean_{window}'] = target.shift(1).rolling(window=window).mean()
-            features[f'lag_std_{window}'] = target.shift(1).rolling(window=window).std()
-            
         return features
     
     def engineer_features(self, data: pd.DataFrame, target_col: str = 'realized_vol_20') -> Tuple[pd.DataFrame, pd.Series]:
