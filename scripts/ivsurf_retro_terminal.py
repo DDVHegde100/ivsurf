@@ -39,6 +39,8 @@ from core.stochastic_vol import StochasticVolatilityEngine, create_heston_model,
 from core.jump_models import JumpModelEngine, JumpDetector, detect_jumps_in_series, create_jump_engine
 from models.heston_advanced import HestonAdvanced, HestonParameters, SimulationScheme
 from models.jump_diffusion import MertonJumpDiffusion, KouJumpDiffusion, MertonParameters, KouParameters, create_merton_model, create_kou_model
+from ml.volatility_forecasting import VolatilityForecaster, EnsembleVolatilityForecaster, TechnicalFeatureEngineer
+from ml.neural_networks import LSTMVolatilityForecaster, LSTMConfig, NetworkArchitecture, VolatilitySurfacePredictor
 from visuals.plot_surface import plot_vol_surface_plotly
 from visuals.heatmap_greeks import GreeksHeatmapGenerator
 from utils.data_cleaning import OptionsDataCleaner
@@ -63,6 +65,13 @@ class RetroTerminal:
         self.jump_engine = create_jump_engine()
         self.merton_model = None
         self.kou_model = None
+        
+        # Initialize ML Components
+        self.feature_engineer = TechnicalFeatureEngineer()
+        self.volatility_forecaster = None
+        self.ensemble_forecaster = None
+        self.lstm_forecaster = None
+        self.surface_predictor = None
         
         # Expanded ticker universe - NASDAQ focus for maximum opportunities
         self.nasdaq_tickers = [
@@ -1721,10 +1730,11 @@ class RetroTerminal:
         self.render_header()
         
         # Enhanced Navigation
-        tab1, tab2, tab3, tab4 = st.tabs([
+        tab1, tab2, tab3, tab4, tab5 = st.tabs([
             "MARKET SCANNER", 
             "INDIVIDUAL ANALYSIS", 
             "VOLATILITY SURFACE", 
+            "ML FORECASTING",
             "SYSTEM STATUS"
         ])
         
@@ -1738,6 +1748,9 @@ class RetroTerminal:
             self.display_volatility_surface()
         
         with tab4:
+            self.display_ml_forecasting()
+        
+        with tab5:
             self.display_system_status()
 
     def display_volatility_surface(self):
@@ -3699,6 +3712,264 @@ class RetroTerminal:
                 
                 else:
                     st.info("Configure jump model parameters above and click 'RUN JUMP MODEL' to begin analysis.")
+
+    def display_ml_forecasting(self):
+        """Display ML forecasting interface with comprehensive models"""
+        
+        st.markdown("""
+        <div class="terminal-box">
+            <div class="terminal-prompt">
+                <span class="glow-green">█</span> MACHINE LEARNING VOLATILITY FORECASTING <span class="glow-green">█</span>
+            </div>
+            <div style="color: #88ff88; font-size: 12px; margin-top: 8px;">
+                Advanced ML models for volatility prediction and surface forecasting
+            </div>
+            <div style="color: #ffff88; font-size: 11px; margin-top: 5px;">
+                Random Forest | Gradient Boosting | LSTM Networks | Ensemble Methods
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # ML Model Selection
+        col1, col2 = st.columns([1, 1])
+        
+        with col1:
+            st.markdown("""
+            <div class="terminal-box">
+                <div class="terminal-prompt">MODEL CONFIGURATION</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            ticker = st.selectbox(
+                "TARGET ASSET",
+                self.all_tickers,
+                index=0,
+                help="Select ticker for volatility forecasting"
+            )
+            
+            model_type = st.selectbox(
+                "ML MODEL TYPE",
+                ["Random Forest", "Gradient Boosting", "LSTM Network", "Ensemble Method"],
+                help="Choose forecasting model architecture"
+            )
+            
+            forecast_horizon = st.selectbox(
+                "FORECAST HORIZON",
+                [1, 5, 10, 20, 30],
+                index=2,
+                help="Number of days to forecast ahead"
+            )
+            
+            feature_engineering = st.multiselect(
+                "TECHNICAL FEATURES",
+                ["RSI", "Bollinger Bands", "MACD", "ATR", "Volatility Clustering", "Price Returns"],
+                default=["RSI", "MACD", "ATR"],
+                help="Select technical indicators for feature engineering"
+            )
+        
+        with col2:
+            st.markdown("""
+            <div class="terminal-box">
+                <div class="terminal-prompt">MODEL PARAMETERS</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            if model_type == "LSTM Network":
+                lstm_units = st.slider("LSTM Units", 25, 200, 50, help="Number of LSTM units")
+                sequence_length = st.slider("Sequence Length", 10, 100, 30, help="Input sequence length")
+                dropout_rate = st.slider("Dropout Rate", 0.0, 0.5, 0.2, help="Regularization dropout")
+                epochs = st.slider("Training Epochs", 20, 200, 50, help="Number of training epochs")
+            
+            elif model_type in ["Random Forest", "Gradient Boosting"]:
+                n_estimators = st.slider("N Estimators", 50, 500, 100, help="Number of trees")
+                max_depth = st.slider("Max Depth", 3, 20, 10, help="Maximum tree depth")
+                learning_rate = st.slider("Learning Rate", 0.01, 0.3, 0.1, help="Learning rate") if model_type == "Gradient Boosting" else None
+            
+            confidence_level = st.slider("Confidence Level", 0.8, 0.99, 0.95, help="Prediction confidence interval")
+            
+            run_forecast = st.button("RUN ML FORECAST", key="ml_forecast_btn")
+        
+        # Display results if forecast is run
+        if run_forecast:
+            try:
+                with st.spinner(f"Training {model_type} model for {ticker}..."):
+                    # Fetch historical data
+                    stock_data = yf.download(ticker, period="2y", interval="1d")
+                    
+                    if stock_data.empty:
+                        st.error(f"No data available for {ticker}")
+                        return
+                    
+                    # Calculate realized volatility
+                    returns = np.log(stock_data['Close'] / stock_data['Close'].shift(1)).dropna()
+                    volatility = returns.rolling(window=21).std() * np.sqrt(252)  # 21-day realized vol
+                    
+                    # Feature engineering
+                    features_df = self.feature_engineer.create_features(stock_data)
+                    
+                    # Align data
+                    aligned_data = pd.concat([features_df, volatility], axis=1).dropna()
+                    features_clean = aligned_data.iloc[:, :-1]
+                    target_clean = aligned_data.iloc[:, -1]
+                    
+                    if len(features_clean) < 50:
+                        st.error("Insufficient data for ML training")
+                        return
+                    
+                    # Initialize and train model
+                    if model_type == "LSTM Network":
+                        config = LSTMConfig(
+                            sequence_length=sequence_length,
+                            lstm_units=[lstm_units, lstm_units//2],
+                            dropout_rate=dropout_rate,
+                            epochs=epochs,
+                            patience=10
+                        )
+                        
+                        forecaster = LSTMVolatilityForecaster(config, NetworkArchitecture.LSTM)
+                        forecaster.fit(features_clean, target_clean)
+                        
+                        # Make prediction
+                        prediction = forecaster.predict(features_clean.tail(sequence_length))
+                        metrics = forecaster.evaluate(features_clean, target_clean)
+                        
+                    elif model_type == "Ensemble Method":
+                        forecaster = EnsembleVolatilityForecaster()
+                        forecaster.fit(features_clean, target_clean)
+                        
+                        prediction, confidence_intervals = forecaster.predict_with_uncertainty(
+                            features_clean.tail(forecast_horizon), 
+                            confidence_level=confidence_level
+                        )
+                        metrics = forecaster.evaluate(features_clean, target_clean)
+                        
+                    else:  # Random Forest or Gradient Boosting
+                        forecaster = VolatilityForecaster()
+                        forecaster.fit(features_clean, target_clean)
+                        
+                        prediction, confidence_intervals = forecaster.predict_with_uncertainty(
+                            features_clean.tail(forecast_horizon),
+                            confidence_level=confidence_level
+                        )
+                        metrics = forecaster.evaluate(features_clean, target_clean)
+                
+                # Display results in retro terminal style
+                st.markdown("""
+                <div class="terminal-box">
+                    <div class="terminal-prompt">FORECAST RESULTS</div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Prediction metrics
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    st.markdown("**MODEL PERFORMANCE**")
+                    st.metric("R² Score", f"{metrics.get('r2', 0):.4f}")
+                    st.metric("RMSE", f"{metrics.get('rmse', 0):.6f}")
+                    st.metric("MAE", f"{metrics.get('mae', 0):.6f}")
+                
+                with col2:
+                    st.markdown("**VOLATILITY FORECAST**")
+                    current_vol = volatility.iloc[-1] if len(volatility) > 0 else 0.2
+                    pred_vol = prediction[0] if hasattr(prediction, '__len__') else prediction
+                    
+                    st.metric("Current Vol", f"{current_vol:.2%}")
+                    st.metric("Predicted Vol", f"{pred_vol:.2%}")
+                    vol_change = ((pred_vol - current_vol) / current_vol) * 100
+                    st.metric("Vol Change", f"{vol_change:+.1f}%")
+                
+                with col3:
+                    st.markdown("**CONFIDENCE INTERVALS**")
+                    if 'confidence_intervals' in locals():
+                        lower, upper = confidence_intervals
+                        st.metric("Lower Bound", f"{lower[0]:.2%}" if hasattr(lower, '__len__') else f"{lower:.2%}")
+                        st.metric("Upper Bound", f"{upper[0]:.2%}" if hasattr(upper, '__len__') else f"{upper:.2%}")
+                        interval_width = (upper[0] - lower[0]) if hasattr(upper, '__len__') else (upper - lower)
+                        st.metric("Interval Width", f"{interval_width:.2%}")
+                
+                # Create forecast visualization
+                if len(volatility) > 30:
+                    fig = go.Figure()
+                    
+                    # Historical volatility
+                    dates = volatility.index[-30:]  # Last 30 days
+                    fig.add_trace(go.Scatter(
+                        x=dates,
+                        y=volatility[-30:],
+                        mode='lines',
+                        name='Historical Vol',
+                        line=dict(color='#88ff88', width=2)
+                    ))
+                    
+                    # Forecast point
+                    forecast_date = dates[-1] + pd.Timedelta(days=forecast_horizon)
+                    fig.add_trace(go.Scatter(
+                        x=[forecast_date],
+                        y=[pred_vol],
+                        mode='markers',
+                        name='Forecast',
+                        marker=dict(color='#ffff88', size=10, symbol='star')
+                    ))
+                    
+                    # Confidence interval
+                    if 'confidence_intervals' in locals():
+                        fig.add_trace(go.Scatter(
+                            x=[forecast_date, forecast_date],
+                            y=[lower[0] if hasattr(lower, '__len__') else lower, 
+                               upper[0] if hasattr(upper, '__len__') else upper],
+                            mode='lines',
+                            name=f'{confidence_level:.0%} CI',
+                            line=dict(color='#ff8888', width=3)
+                        ))
+                    
+                    fig.update_layout(
+                        title=f"Volatility Forecast for {ticker}",
+                        xaxis_title="Date",
+                        yaxis_title="Volatility",
+                        plot_bgcolor='black',
+                        paper_bgcolor='black',
+                        font=dict(color='#88ff88', family='Courier New', size=10),
+                        height=400
+                    )
+                    
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                # Feature importance (if available)
+                if hasattr(forecaster, 'get_feature_importance'):
+                    importance = forecaster.get_feature_importance()
+                    if importance:
+                        st.markdown("""
+                        <div class="terminal-box">
+                            <div class="terminal-prompt">FEATURE IMPORTANCE</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        importance_df = pd.DataFrame(
+                            list(importance.items()), 
+                            columns=['Feature', 'Importance']
+                        ).sort_values('Importance', ascending=False)
+                        
+                        fig_imp = px.bar(
+                            importance_df.head(10),
+                            x='Importance',
+                            y='Feature',
+                            orientation='h',
+                            title="Top 10 Feature Importance"
+                        )
+                        
+                        fig_imp.update_layout(
+                            plot_bgcolor='black',
+                            paper_bgcolor='black',
+                            font=dict(color='#88ff88', family='Courier New', size=10),
+                            height=300
+                        )
+                        
+                        st.plotly_chart(fig_imp, use_container_width=True)
+                
+            except Exception as e:
+                st.error(f"ML forecasting failed: {str(e)}")
+                st.error("Please check your parameters and data availability.")
 
     def display_system_status(self):
         """Display system status information"""
