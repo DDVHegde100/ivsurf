@@ -45,6 +45,11 @@ try:
     TF_AVAILABLE = True
 except ImportError:
     TF_AVAILABLE = False
+    # Create dummy classes for type hints when TensorFlow isn't available
+    class Model:
+        pass
+    class Sequential:
+        pass
     warnings.warn("TensorFlow not available. Using sklearn-based neural networks as fallback.")
 
 # Fallback to sklearn if TensorFlow not available
@@ -228,8 +233,11 @@ class LSTMVolatilityForecaster:
             warnings.warn("TensorFlow not available. Falling back to MLP architecture.")
             self.architecture = NetworkArchitecture.MLP
     
-    def _build_lstm_model(self, input_shape: Tuple[int, int]) -> Model:
+    def _build_lstm_model(self, input_shape: Tuple[int, int]):
         """Build LSTM model"""
+        if not TF_AVAILABLE:
+            raise ImportError("TensorFlow required for LSTM models")
+        
         model = Sequential()
         
         # First LSTM layer
@@ -260,8 +268,11 @@ class LSTMVolatilityForecaster:
         
         return model
     
-    def _build_gru_model(self, input_shape: Tuple[int, int]) -> Model:
+    def _build_gru_model(self, input_shape: Tuple[int, int]):
         """Build GRU model"""
+        if not TF_AVAILABLE:
+            raise ImportError("TensorFlow required for GRU models")
+        
         model = Sequential()
         
         # First GRU layer
@@ -292,8 +303,11 @@ class LSTMVolatilityForecaster:
         
         return model
     
-    def _build_cnn_lstm_model(self, input_shape: Tuple[int, int]) -> Model:
+    def _build_cnn_lstm_model(self, input_shape: Tuple[int, int]):
         """Build CNN-LSTM hybrid model"""
+        if not TF_AVAILABLE:
+            raise ImportError("TensorFlow required for CNN-LSTM models")
+        
         model = Sequential()
         
         # CNN layers for pattern extraction
@@ -321,8 +335,11 @@ class LSTMVolatilityForecaster:
         
         return model
     
-    def _build_attention_lstm_model(self, input_shape: Tuple[int, int]) -> Model:
+    def _build_attention_lstm_model(self, input_shape: Tuple[int, int]):
         """Build LSTM model with attention mechanism"""
+        if not TF_AVAILABLE:
+            raise ImportError("TensorFlow required for attention models")
+        
         # Input layer
         inputs = Input(shape=input_shape)
         
@@ -574,7 +591,7 @@ class VolatilitySurfacePredictor:
         self.preprocessor = SequencePreprocessor(sequence_length=30)
         self.is_fitted = False
     
-    def _build_surface_model(self, input_shape: Tuple[int, int]) -> Model:
+    def _build_surface_model(self, input_shape: Tuple[int, int]):
         """Build multi-output model for surface prediction"""
         if not TF_AVAILABLE:
             raise ImportError("TensorFlow required for surface prediction")
