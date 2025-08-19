@@ -26,12 +26,19 @@ try:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from risk.var_analysis import VaRAnalyzer
     from risk.stress_testing import StressTester
+    from models.regime_switching import MarkovRegimeSwitching
+    from models.garch import GARCHModel, VolatilityBreakpointDetection
     RISK_MODULES_AVAILABLE = True
+    REGIME_MODELS_AVAILABLE = True
 except ImportError:
     # Fallback if modules not available
     VaRAnalyzer = None
     StressTester = None
+    MarkovRegimeSwitching = None
+    GARCHModel = None
+    VolatilityBreakpointDetection = None
     RISK_MODULES_AVAILABLE = False
+    REGIME_MODELS_AVAILABLE = False
 import sys
 import os
 from datetime import datetime, timedelta
@@ -2325,12 +2332,13 @@ class RetroTerminal:
         """, unsafe_allow_html=True)
         
         # Create enhanced tabs with better naming and icons
-        tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
             "YESTERDAY'S WINNERS", 
             "TOMORROW'S GAINS", 
             "OPTIONS - YESTERDAY", 
             "OPTIONS - TOMORROW",
-            "RISK MANAGEMENT"
+            "RISK MANAGEMENT",
+            "REGIME ANALYSIS"
         ])
         
         with tab1:
@@ -2536,6 +2544,10 @@ class RetroTerminal:
         with tab5:
             # Risk Management Dashboard
             self.display_risk_management_dashboard()
+        
+        with tab6:
+            # Regime Analysis Dashboard
+            self.display_regime_analysis_dashboard()
         
         # Enhanced market intelligence summary
         st.markdown("""
@@ -2879,6 +2891,314 @@ class RetroTerminal:
         )
         
         st.plotly_chart(fig, use_container_width=True)
+    
+    def display_regime_analysis_dashboard(self):
+        """
+        Display regime detection and volatility clustering analysis
+        """
+        st.markdown("""
+        <div class="terminal-box">
+            <div class="terminal-prompt">
+                <span class="glow-blue">█</span> REGIME DETECTION & VOLATILITY CLUSTERING <span class="glow-blue">█</span>
+            </div>
+            <div style="color: #6666ff; font-size: 13px; margin-top: 8px;">
+                MARKOV REGIME SWITCHING & GARCH VOLATILITY MODELS
+            </div>
+            <div style="color: #aaaaff; font-size: 11px; margin-top: 5px; font-style: italic;">
+                Bull/Bear Detection | Volatility Clustering | Structural Breaks
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        if not REGIME_MODELS_AVAILABLE:
+            st.error("❌ Regime analysis modules not available. Please check installation.")
+            return
+        
+        # Ticker selection for analysis
+        st.markdown("### 📈 Stock Selection for Regime Analysis")
+        
+        col1, col2 = st.columns([3, 1])
+        
+        with col1:
+            regime_ticker = st.selectbox(
+                "Select Stock for Analysis:",
+                options=["AAPL", "MSFT", "GOOGL", "TSLA", "NVDA", "SPY", "QQQ", "AMZN", "META", "NFLX"],
+                index=0,
+                help="Choose a stock for comprehensive regime and volatility analysis"
+            )
+        
+        with col2:
+            analysis_period = st.selectbox(
+                "Analysis Period:",
+                options=["1y", "2y", "3y", "5y"],
+                index=1,
+                help="Historical period for analysis"
+            )
+        
+        if st.button("🔍 RUN REGIME ANALYSIS", type="primary"):
+            with st.spinner('🧮 Analyzing market regimes and volatility patterns...'):
+                regime_results = self.perform_regime_analysis(regime_ticker, analysis_period)
+            
+            if 'error' in regime_results:
+                st.error(f"❌ {regime_results['error']}")
+                return
+            
+            # Display results
+            self._display_regime_results(regime_results)
+    
+    def perform_regime_analysis(self, ticker, period="2y"):
+        """
+        Perform comprehensive regime analysis
+        
+        Args:
+            ticker: Stock ticker for analysis
+            period: Analysis period
+            
+        Returns:
+            dict: Regime analysis results
+        """
+        if not REGIME_MODELS_AVAILABLE:
+            return {'error': 'Regime analysis modules not available'}
+        
+        try:
+            # Download historical data
+            data = yf.download(ticker, period=period, progress=False)
+            
+            if data.empty or len(data) < 100:
+                return {'error': f'Insufficient data for {ticker}'}
+            
+            # Calculate returns
+            returns = data['Close'].pct_change().dropna()
+            
+            if len(returns) < 50:
+                return {'error': 'Insufficient return data for analysis'}
+            
+            # 1. Markov Regime Switching Analysis
+            regime_model = MarkovRegimeSwitching(n_regimes=2)
+            regime_fit = regime_model.fit(returns)
+            
+            if regime_fit['converged']:
+                regime_probs = regime_model.get_regime_probabilities(returns)
+                regime_stats = regime_model.regime_statistics()
+                regime_changes = regime_model.detect_regime_changes(returns)
+            else:
+                regime_probs = None
+                regime_stats = None
+                regime_changes = []
+            
+            # 2. GARCH Volatility Modeling
+            garch_model = GARCHModel(model_type='GARCH')
+            garch_fit = garch_model.fit(returns)
+            
+            if garch_fit['success']:
+                volatility_forecast = garch_model.forecast_volatility(steps=30)
+                volatility_clustering = garch_model.volatility_clustering_test()
+                model_diagnostics = garch_model.model_diagnostics()
+                conditional_volatility = garch_model.conditional_volatility
+            else:
+                volatility_forecast = None
+                volatility_clustering = None
+                model_diagnostics = None
+                conditional_volatility = None
+            
+            # 3. Volatility Breakpoint Detection
+            breakpoint_detector = VolatilityBreakpointDetection()
+            icss_results = breakpoint_detector.detect_breakpoints(returns, method='ICSS')
+            cusum_results = breakpoint_detector.detect_breakpoints(returns, method='CUSUM')
+            
+            return {
+                'ticker': ticker,
+                'period': period,
+                'returns': returns.tolist(),
+                'dates': data.index.strftime('%Y-%m-%d').tolist(),
+                'prices': data['Close'].tolist(),
+                
+                # Regime Analysis
+                'regime_analysis': {
+                    'model_fit': regime_fit,
+                    'regime_probabilities': regime_probs.tolist() if regime_probs is not None else None,
+                    'regime_statistics': regime_stats,
+                    'regime_changes': regime_changes
+                },
+                
+                # GARCH Analysis
+                'garch_analysis': {
+                    'model_fit': garch_fit,
+                    'volatility_forecast': volatility_forecast.tolist() if volatility_forecast is not None else None,
+                    'volatility_clustering': volatility_clustering,
+                    'model_diagnostics': model_diagnostics,
+                    'conditional_volatility': conditional_volatility.tolist() if conditional_volatility is not None else None
+                },
+                
+                # Breakpoint Analysis
+                'breakpoint_analysis': {
+                    'icss_results': icss_results,
+                    'cusum_results': cusum_results
+                },
+                
+                'success': True
+            }
+            
+        except Exception as e:
+            return {'error': f'Regime analysis failed: {str(e)}'}
+    
+    def _display_regime_results(self, results):
+        """Display regime analysis results"""
+        
+        # Market Regime Summary
+        st.markdown("### 🎯 Market Regime Detection")
+        
+        regime_stats = results['regime_analysis']['regime_statistics']
+        if regime_stats:
+            col1, col2 = st.columns(2)
+            
+            for i, (regime_name, stats) in enumerate(regime_stats.items()):
+                with col1 if i == 0 else col2:
+                    st.markdown(f"""
+                    <div style="padding: 15px; background: {'rgba(0,255,0,0.1)' if 'Bull' in regime_name else 'rgba(255,0,0,0.1)'}; 
+                                border: 1px solid {'#00ff00' if 'Bull' in regime_name else '#ff0000'}; border-radius: 8px; margin-bottom: 10px;">
+                        <h4 style="color: {'#00ff00' if 'Bull' in regime_name else '#ff0000'}; margin: 0;">{regime_name}</h4>
+                        <div style="color: #ffffff; font-size: 12px; margin-top: 10px;">
+                            <strong>Annual Return:</strong> {stats['annual_return']*100:.1f}%<br>
+                            <strong>Annual Volatility:</strong> {stats['annual_volatility']*100:.1f}%<br>
+                            <strong>Persistence:</strong> {stats['persistence']*100:.1f}%<br>
+                            <strong>Long-term Probability:</strong> {stats['steady_state_prob']*100:.1f}%
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+        
+        # Current Regime Probability
+        regime_probs = results['regime_analysis']['regime_probabilities']
+        if regime_probs:
+            current_bull_prob = regime_probs[-1][0] if regime_stats and 'Bull' in list(regime_stats.keys())[0] else regime_probs[-1][1]
+            current_bear_prob = 1 - current_bull_prob
+            
+            st.markdown("### 📊 Current Market State")
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.metric(
+                    "Bull Market Probability",
+                    f"{current_bull_prob*100:.1f}%",
+                    delta=f"{'Bullish' if current_bull_prob > 0.5 else 'Bearish'}"
+                )
+            
+            with col2:
+                st.metric(
+                    "Bear Market Probability", 
+                    f"{current_bear_prob*100:.1f}%",
+                    delta=f"{'Bearish' if current_bear_prob > 0.5 else 'Bullish'}"
+                )
+        
+        # GARCH Volatility Analysis
+        st.markdown("### 📈 GARCH Volatility Analysis")
+        
+        garch_fit = results['garch_analysis']['model_fit']
+        if garch_fit and garch_fit['success']:
+            col1, col2, col3, col4 = st.columns(4)
+            
+            params = garch_fit['parameters']
+            
+            with col1:
+                st.metric(
+                    "GARCH Omega (ω)",
+                    f"{params['omega']:.6f}"
+                )
+            
+            with col2:
+                st.metric(
+                    "GARCH Alpha (α)",
+                    f"{params['alpha']:.3f}"
+                )
+            
+            with col3:
+                st.metric(
+                    "GARCH Beta (β)",
+                    f"{params['beta']:.3f}"
+                )
+            
+            with col4:
+                st.metric(
+                    "Persistence (α+β)",
+                    f"{params['persistence']:.3f}",
+                    delta="High" if params['persistence'] > 0.95 else "Moderate"
+                )
+        
+        # Volatility Clustering Test
+        vol_clustering = results['garch_analysis']['volatility_clustering']
+        if vol_clustering:
+            st.markdown("### 🔍 Volatility Clustering Detection")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.metric(
+                    "ARCH Test p-value",
+                    f"{vol_clustering['arch_p_value']:.4f}",
+                    delta="Clustering Detected" if vol_clustering['volatility_clustering_detected'] else "No Clustering"
+                )
+            
+            with col2:
+                persistence = vol_clustering['volatility_persistence']
+                if persistence:
+                    st.metric(
+                        "Volatility Persistence",
+                        f"{persistence:.3f}",
+                        delta="Very High" if persistence > 0.95 else "High" if persistence > 0.85 else "Moderate"
+                    )
+        
+        # Regime Changes Timeline
+        regime_changes = results['regime_analysis']['regime_changes']
+        if regime_changes:
+            st.markdown("### 📅 Recent Regime Changes")
+            
+            changes_df = pd.DataFrame(regime_changes)
+            if not changes_df.empty:
+                # Show only recent changes
+                recent_changes = changes_df.tail(5)
+                
+                for _, change in recent_changes.iterrows():
+                    from_regime = "Bull" if change['from_regime'] == 0 else "Bear"
+                    to_regime = "Bull" if change['to_regime'] == 0 else "Bear"
+                    
+                    color = "#00ff00" if to_regime == "Bull" else "#ff0000"
+                    
+                    st.markdown(f"""
+                    <div style="padding: 10px; background: rgba(255,255,255,0.05); border-left: 4px solid {color}; margin: 5px 0;">
+                        <strong>Regime Change:</strong> {from_regime} → {to_regime}<br>
+                        <strong>Confidence:</strong> {change['confidence']*100:.1f}%<br>
+                        <strong>Position:</strong> Day {change['date_index']}
+                    </div>
+                    """, unsafe_allow_html=True)
+        
+        # Volatility Forecast
+        vol_forecast = results['garch_analysis']['volatility_forecast']
+        if vol_forecast:
+            st.markdown("### 🔮 30-Day Volatility Forecast")
+            
+            forecast_df = pd.DataFrame({
+                'Day': range(1, len(vol_forecast) + 1),
+                'Forecasted_Volatility': [v * np.sqrt(252) * 100 for v in vol_forecast]  # Annualized %
+            })
+            
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=forecast_df['Day'],
+                y=forecast_df['Forecasted_Volatility'],
+                mode='lines+markers',
+                name='Volatility Forecast',
+                line=dict(color='orange', width=2)
+            ))
+            
+            fig.update_layout(
+                title="GARCH Volatility Forecast (30 Days)",
+                xaxis_title="Days Ahead",
+                yaxis_title="Annualized Volatility (%)",
+                template='plotly_dark',
+                height=400
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
 
     def run(self):
         """Main application runner"""
@@ -2886,12 +3206,13 @@ class RetroTerminal:
         self.render_header()
         
         # Enhanced Navigation with new advanced features
-        tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
             "MARKET SCANNER", 
             "INDIVIDUAL ANALYSIS", 
             "VOLATILITY SURFACE", 
             "ML FORECASTING",
-            "TECHNICAL ANALYSIS",
+            "RISK MANAGEMENT",
+            "REGIME ANALYSIS",
             "MONTE CARLO SIM",
             "SYSTEM STATUS"
         ])
@@ -2909,12 +3230,21 @@ class RetroTerminal:
             self.display_ml_forecasting()
         
         with tab5:
-            self.display_technical_analysis()
+            if RISK_MODULES_AVAILABLE:
+                self.display_risk_management_dashboard()
+            else:
+                st.error("❌ Risk management modules not available. Please check installation.")
         
         with tab6:
-            self.display_monte_carlo_simulation()
+            if REGIME_MODELS_AVAILABLE:
+                self.display_regime_analysis_dashboard()
+            else:
+                st.error("❌ Regime analysis modules not available. Please check installation.")
         
         with tab7:
+            self.display_monte_carlo_simulation()
+        
+        with tab8:
             self.display_system_status()
 
     def display_volatility_surface(self):
