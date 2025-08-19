@@ -33,6 +33,8 @@ from core.black_scholes import black_scholes_price, implied_volatility
 from core.greeks import delta, gamma, vega, theta, rho
 from core.interpolation import interpolate_surface, adaptive_interpolation
 from core.advanced_interpolation import AdvancedSurfaceInterpolator, SurfaceSmoothing
+from core.gaussian_process import VolatilitySurfaceGP
+from core.surface_smoothing import SurfaceSmoothingEngine, smooth_volatility_surface
 from visuals.plot_surface import plot_vol_surface_plotly
 from visuals.heatmap_greeks import GreeksHeatmapGenerator
 from utils.data_cleaning import OptionsDataCleaner
@@ -45,6 +47,8 @@ class RetroTerminal:
         self.heatmap_generator = GreeksHeatmapGenerator()
         self.surface_interpolator = AdvancedSurfaceInterpolator()
         self.data_cleaner = OptionsDataCleaner()
+        self.surface_smoother = SurfaceSmoothingEngine()
+        self.gp_model = None  # Will be initialized when needed
         
         # Expanded ticker universe - NASDAQ focus for maximum opportunities
         self.nasdaq_tickers = [
@@ -1772,10 +1776,51 @@ class RetroTerminal:
             )
         
         with col4:
+            # Add GP smoothing toggle
+            use_gp_smoothing = st.checkbox(
+                "GP SMOOTHING",
+                value=False,
+                help="Apply Gaussian Process smoothing to surface"
+            )
+        
+        # Second row of controls
+        col5, col6, col7, col8 = st.columns(4)
+        
+        with col5:
             if st.button("ANALYZE SURFACE", use_container_width=True, type="primary"):
                 st.session_state.surface_ticker = ticker
                 st.session_state.surface_rate = risk_free_rate
                 st.session_state.interp_method = interp_method
+                st.session_state.use_gp_smoothing = use_gp_smoothing
+        
+        with col6:
+            if use_gp_smoothing:
+                gp_kernel = st.selectbox(
+                    "GP KERNEL",
+                    ["matern", "rbf", "composite"],
+                    index=0,
+                    help="Gaussian Process kernel type"
+                )
+                st.session_state.gp_kernel = gp_kernel
+        
+        with col7:
+            if use_gp_smoothing:
+                smoothing_strength = st.slider(
+                    "SMOOTHING",
+                    min_value=0.1,
+                    max_value=2.0,
+                    value=1.0,
+                    step=0.1,
+                    help="GP smoothing strength"
+                )
+                st.session_state.smoothing_strength = smoothing_strength
+        
+        with col8:
+            show_uncertainty = st.checkbox(
+                "SHOW UNCERTAINTY",
+                value=True,
+                help="Display GP uncertainty bands"
+            ) if use_gp_smoothing else False
         
         # Add surface type selector below the grid
         surface_type = st.selectbox(
@@ -1789,7 +1834,11 @@ class RetroTerminal:
                 st.session_state.surface_ticker, 
                 st.session_state.surface_rate,
                 st.session_state.get('interp_method', 'bicubic'),
-                surface_type
+                surface_type,
+                st.session_state.get('use_gp_smoothing', False),
+                st.session_state.get('gp_kernel', 'matern'),
+                st.session_state.get('smoothing_strength', 1.0),
+                show_uncertainty if 'show_uncertainty' in locals() else False
             )
 
     def fetch_options_data(self, ticker, risk_free_rate=0.05):
@@ -1913,8 +1962,10 @@ class RetroTerminal:
                 
         return pd.DataFrame(iv_data) if iv_data else None
 
-    def create_interactive_volatility_surface(self, iv_data, interp_method='bicubic'):
-        """Create interactive 3D volatility surface with enhanced interpolation"""
+    def create_interactive_volatility_surface(self, iv_data, interp_method='bicubic', 
+                                             use_gp_smoothing=False, gp_kernel='matern',
+                                             smoothing_strength=1.0, show_uncertainty=True):
+        """Create interactive 3D volatility surface with GP smoothing and uncertainty"""
         if iv_data is None or iv_data.empty:
             return None
             
@@ -1972,6 +2023,45 @@ class RetroTerminal:
                 strike_grid = strike_grid_interp
                 expiry_grid = expiry_grid_interp
                 iv_grid_interp = iv_grid_interp
+                
+                # Apply GP smoothing if requested
+                if use_gp_smoothing and len(iv_points) > 5:
+                    try:
+                        # Apply GP smoothing to the surface
+                        smoothed_surface, smoothing_stats = self.surface_smoother.smooth_surface(
+                            iv_grid_interp,
+                            method='gaussian_process',
+                            strikes=strikes_array,
+                            expiries=expiries_array,
+                            original_points=(
+                                np.array(strike_points),
+                                np.array(expiry_points), 
+                                np.array(iv_points)
+                            ),
+                            kernel_type=gp_kernel
+                        )
+                        
+                        # Store GP model for uncertainty calculation
+                        if 'gaussian_process' in smoothing_stats.get('method', ''):
+                            self.gp_model = VolatilitySurfaceGP(kernel_type=gp_kernel)
+                            self.gp_model.fit(
+                                np.array(strike_points),
+                                np.array(expiry_points),
+                                np.array(iv_points)
+                            )
+                            
+                            # Get uncertainty if requested
+                            if show_uncertainty:
+                                _, uncertainty_surface = self.gp_model.predict_surface(
+                                    strike_grid, expiry_grid, return_std=True
+                                )
+                                st.session_state.uncertainty_surface = uncertainty_surface
+                        
+                        iv_grid_interp = smoothed_surface
+                        st.session_state.smoothing_stats = smoothing_stats
+                        
+                    except Exception as e:
+                        st.warning(f"GP smoothing failed, using interpolated surface: {str(e)}")
             else:
                 # Fallback to original method
                 from scipy.interpolate import griddata
@@ -2035,34 +2125,69 @@ class RetroTerminal:
                 iv_grid_interp = iv_grid
         
         # Create enhanced 3D surface plot with retro styling
-        fig = go.Figure(data=[
-            go.Surface(
+        fig = go.Figure()
+        
+        # Main volatility surface
+        main_surface = go.Surface(
+            x=expiry_grid,
+            y=strike_grid,
+            z=iv_grid_interp,
+            colorscale=[
+                [0, '#000000'],      # Black
+                [0.2, '#004400'],    # Dark green
+                [0.4, '#008800'],    # Medium green
+                [0.6, '#00ff00'],    # Bright green
+                [0.8, '#44ff44'],    # Light green
+                [1, '#88ff88']       # Very light green
+            ],
+            name='Implied Volatility Surface',
+            colorbar=dict(
+                title="Implied Volatility",
+                titlefont=dict(color='#00ff00'),
+                tickfont=dict(color='#00ff00')
+            ),
+            hovertemplate='<b>Time to Expiry</b>: %{x:.3f} years<br>' +
+                         '<b>Strike</b>: $%{y:.2f}<br>' +
+                         '<b>Implied Vol</b>: %{z:.2%}<extra></extra>',
+            opacity=0.9
+        )
+        
+        fig.add_trace(main_surface)
+        
+        # Add uncertainty bands if available
+        if show_uncertainty and hasattr(st.session_state, 'uncertainty_surface'):
+            uncertainty = st.session_state.uncertainty_surface
+            
+            # Upper uncertainty band
+            upper_surface = go.Surface(
                 x=expiry_grid,
                 y=strike_grid,
-                z=iv_grid_interp,
-                colorscale=[
-                    [0, '#000000'],      # Black
-                    [0.2, '#004400'],    # Dark green
-                    [0.4, '#008800'],    # Medium green
-                    [0.6, '#00ff00'],    # Bright green
-                    [0.8, '#44ff44'],    # Light green
-                    [1, '#88ff88']       # Very light green
-                ],
-                name='Implied Volatility Surface',
-                colorbar=dict(
-                    title="Implied Volatility",
-                    titlefont=dict(color='#00ff00'),
-                    tickfont=dict(color='#00ff00')
-                ),
-                hovertemplate='<b>Time to Expiry</b>: %{x:.3f} years<br>' +
-                             '<b>Strike</b>: $%{y:.2f}<br>' +
-                             '<b>Implied Vol</b>: %{z:.2%}<extra></extra>'
+                z=iv_grid_interp + 2 * uncertainty,  # 95% confidence
+                colorscale=[[0, '#444444'], [1, '#666666']],
+                showscale=False,
+                name='Upper 95% CI',
+                opacity=0.3,
+                hovertemplate='<b>Upper 95% CI</b>: %{z:.2%}<extra></extra>'
             )
-        ])
+            
+            # Lower uncertainty band  
+            lower_surface = go.Surface(
+                x=expiry_grid,
+                y=strike_grid,
+                z=np.maximum(iv_grid_interp - 2 * uncertainty, 0),  # Ensure positive
+                colorscale=[[0, '#444444'], [1, '#666666']],
+                showscale=False,
+                name='Lower 95% CI',
+                opacity=0.3,
+                hovertemplate='<b>Lower 95% CI</b>: %{z:.2%}<extra></extra>'
+            )
+            
+            fig.add_trace(upper_surface)
+            fig.add_trace(lower_surface)
         
         fig.update_layout(
             title={
-                'text': 'INTERACTIVE IMPLIED VOLATILITY SURFACE',
+                'text': f'INTERACTIVE IMPLIED VOLATILITY SURFACE - {use_gp_smoothing and "GP SMOOTHED" or "STANDARD"}',
                 'font': {'color': '#00ff00', 'size': 18},
                 'x': 0.5
             },
@@ -2274,8 +2399,10 @@ class RetroTerminal:
         except Exception as e:
             st.error(f"Error generating heatmap: {str(e)}")
 
-    def run_surface_analysis(self, ticker, risk_free_rate, interp_method, surface_type):
-        """Run comprehensive surface analysis with enhanced interpolation"""
+    def run_surface_analysis(self, ticker, risk_free_rate, interp_method, surface_type, 
+                           use_gp_smoothing=False, gp_kernel='matern', smoothing_strength=1.0, 
+                           show_uncertainty=True):
+        """Run comprehensive surface analysis with GP smoothing"""
         
         st.markdown(f"""
         <div class="terminal-box">
@@ -2344,7 +2471,10 @@ class RetroTerminal:
                 </div>
                 """, unsafe_allow_html=True)
                 
-                surface_fig = self.create_interactive_volatility_surface(iv_data, interp_method)
+                surface_fig = self.create_interactive_volatility_surface(
+                    iv_data, interp_method, use_gp_smoothing, gp_kernel, 
+                    smoothing_strength, show_uncertainty
+                )
                 if surface_fig:
                     st.plotly_chart(surface_fig, use_container_width=True)
                 else:
@@ -2531,6 +2661,23 @@ class RetroTerminal:
                             st.markdown("**DATA CLEANING:**")
                             st.metric("REMOVAL RATE", f"{clean_stats['removal_rate']:.1%}")
                             st.metric("QUALITY SCORE", f"{clean_stats['data_quality_score']:.2f}")
+                        
+                        # GP smoothing statistics
+                        if hasattr(st.session_state, 'smoothing_stats'):
+                            smooth_stats = st.session_state.smoothing_stats
+                            st.markdown("**GP SMOOTHING:**")
+                            if 'correlation' in smooth_stats:
+                                st.metric("CORRELATION", f"{smooth_stats['correlation']:.3f}")
+                            if 'smoothness_improvement' in smooth_stats:
+                                st.metric("SMOOTHING", f"{smooth_stats['smoothness_improvement']:.1%}")
+                            
+                            # GP hyperparameters
+                            if 'hyperparameters' in smooth_stats:
+                                hyperparams = smooth_stats['hyperparameters']
+                                st.markdown("**GP HYPERPARAMETERS:**")
+                                for key, value in hyperparams.items():
+                                    if isinstance(value, (int, float)) and not key.startswith('kernel_'):
+                                        st.write(f"{key.upper()}: {value:.4f}")
                 else:
                     st.info("Run surface analysis to see quality metrics")
 
