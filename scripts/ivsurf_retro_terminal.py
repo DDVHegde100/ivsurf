@@ -29,15 +29,23 @@ warnings.filterwarnings('ignore')
 # Add parent directory to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from core.black_scholes import black_scholes_price
+from core.black_scholes import black_scholes_price, implied_volatility
 from core.greeks import delta, gamma, vega, theta, rho
 from core.interpolation import interpolate_surface, adaptive_interpolation
+from core.advanced_interpolation import AdvancedSurfaceInterpolator, SurfaceSmoothing
 from visuals.plot_surface import plot_vol_surface_plotly
+from visuals.heatmap_greeks import GreeksHeatmapGenerator
+from utils.data_cleaning import OptionsDataCleaner
 
 class RetroTerminal:
     """Classic 1996 Investment Banking Terminal"""
     
     def __init__(self):
+        # Initialize advanced visualization components
+        self.heatmap_generator = GreeksHeatmapGenerator()
+        self.surface_interpolator = AdvancedSurfaceInterpolator()
+        self.data_cleaner = OptionsDataCleaner()
+        
         # Expanded ticker universe - NASDAQ focus for maximum opportunities
         self.nasdaq_tickers = [
             # Tech Giants
@@ -1134,10 +1142,10 @@ class RetroTerminal:
                 <span class="glow-green">█</span> NASDAQ DISCOVERY ENGINE <span class="glow-green">█</span>
             </div>
             <div style="color: #66ff66; font-size: 13px; margin-top: 8px;">
-                🎯 SCANNING 100+ NASDAQ STOCKS FOR FRESH GAIN OPPORTUNITIES
+                SCANNING 100+ NASDAQ STOCKS FOR FRESH GAIN OPPORTUNITIES
             </div>
             <div style="color: #88ff88; font-size: 11px; margin-top: 5px; font-style: italic;">
-                ▶ Focus: Buy Today, Sell Tomorrow | Target: Maximum % Gains
+                Focus: Buy Today, Sell Tomorrow | Target: Maximum % Gains
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -1196,23 +1204,23 @@ class RetroTerminal:
         
         # Create enhanced tabs with better naming and icons
         tab1, tab2, tab3, tab4 = st.tabs([
-            "📊 YESTERDAY'S WINNERS", 
-            "🎯 TOMORROW'S GAINS", 
-            "📈 OPTIONS - YESTERDAY", 
-            "🚀 OPTIONS - TOMORROW"
+            "YESTERDAY'S WINNERS", 
+            "TOMORROW'S GAINS", 
+            "OPTIONS - YESTERDAY", 
+            "OPTIONS - TOMORROW"
         ])
         
         with tab1:
             st.markdown("""
             <div class="terminal-box">
                 <div class="terminal-prompt">
-                    📊 HISTORICAL PERFORMANCE | TOP 10 SWING TRADES
+                    HISTORICAL PERFORMANCE | TOP 10 SWING TRADES
                 </div>
                 <div style="color: #ffff88; font-size: 12px; margin-top: 8px;">
-                    ✓ Stocks that delivered the highest swing profits yesterday
+                    Stocks that delivered the highest swing profits yesterday
                 </div>
                 <div style="color: #88ff88; font-size: 11px; margin-top: 5px;">
-                    ▶ Use for validation and pattern recognition
+                    Use for validation and pattern recognition
                 </div>
             </div>
             """, unsafe_allow_html=True)
@@ -1244,13 +1252,13 @@ class RetroTerminal:
             st.markdown("""
             <div class="terminal-box">
                 <div class="terminal-prompt">
-                    🎯 TOMORROW'S PREDICTED WINNERS | FRESH OPPORTUNITIES
+                    TOMORROW'S PREDICTED WINNERS | FRESH OPPORTUNITIES
                 </div>
                 <div style="color: #ffff00; font-size: 12px; margin-top: 8px;">
-                    ⚡ NEW STOCKS: Different from yesterday's winners, highest % gain potential
+                    NEW STOCKS: Different from yesterday's winners, highest % gain potential
                 </div>
                 <div style="color: #88ff88; font-size: 11px; margin-top: 5px;">
-                    ▶ Buy Today, Sell Tomorrow Strategy | Elite Quant Algorithms
+                    Buy Today, Sell Tomorrow Strategy | Elite Quant Algorithms
                 </div>
             </div>
             """, unsafe_allow_html=True)
@@ -1296,10 +1304,10 @@ class RetroTerminal:
             st.markdown("""
             <div class="terminal-box">
                 <div class="terminal-prompt">
-                    📈 HISTORICAL OPTIONS | YESTERDAY'S BEST PLAYS
+                    HISTORICAL OPTIONS | YESTERDAY'S BEST PLAYS
                 </div>
                 <div style="color: #ffff88; font-size: 12px; margin-top: 8px;">
-                    ✓ Options that would have been most profitable yesterday
+                    Options that would have been most profitable yesterday
                 </div>
             </div>
             """, unsafe_allow_html=True)
@@ -1321,10 +1329,10 @@ class RetroTerminal:
             st.markdown("""
             <div class="terminal-box">
                 <div class="terminal-prompt">
-                    🚀 TOMORROW'S OPTIONS | MAXIMUM LEVERAGE OPPORTUNITIES
+                    TOMORROW'S OPTIONS | MAXIMUM LEVERAGE OPPORTUNITIES
                 </div>
                 <div style="color: #ffff00; font-size: 12px; margin-top: 8px;">
-                    ⚡ CALL OPTIONS: Stocks predicted for biggest moves tomorrow
+                    CALL OPTIONS: Stocks predicted for biggest moves tomorrow
                 </div>
             </div>
             """, unsafe_allow_html=True)
@@ -1410,7 +1418,7 @@ class RetroTerminal:
                 <span class="glow-green">█</span> INDIVIDUAL ANALYSIS <span class="glow-green">█</span> TICKER DEEP DIVE
             </div>
             <div style="color: #66ff66; font-size: 12px; margin-top: 8px;">
-                🔍 Comprehensive analysis of selected stock with elite algorithms
+                Comprehensive analysis of selected stock with elite algorithms
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -1426,19 +1434,19 @@ class RetroTerminal:
         
         with col1:
             ticker = st.selectbox(
-                "🎯 SELECT TICKER FOR ANALYSIS", 
+                "SELECT TICKER FOR ANALYSIS", 
                 self.all_tickers[:50], 
                 index=0,
                 help="Choose from top 50 NASDAQ stocks for detailed analysis"
             )
         
         with col2:
-            if st.button("🔬 ANALYZE", use_container_width=True, type="primary"):
+            if st.button("ANALYZE", use_container_width=True, type="primary"):
                 st.session_state.analyze_ticker = ticker
         
         with col3:
             analysis_type = st.selectbox(
-                "📊 ANALYSIS TYPE", 
+                "ANALYSIS TYPE", 
                 ["OPTIONS", "SWING", "VOLATILITY"],
                 help="Choose the type of analysis to perform"
             )
@@ -1694,8 +1702,13 @@ class RetroTerminal:
         self.set_page_config()
         self.render_header()
         
-        # Navigation
-        tab1, tab2, tab3 = st.tabs(["MARKET SCANNER", "INDIVIDUAL ANALYSIS", "SYSTEM STATUS"])
+        # Enhanced Navigation
+        tab1, tab2, tab3, tab4 = st.tabs([
+            "MARKET SCANNER", 
+            "INDIVIDUAL ANALYSIS", 
+            "VOLATILITY SURFACE", 
+            "SYSTEM STATUS"
+        ])
         
         with tab1:
             self.display_top_opportunities()
@@ -1704,7 +1717,822 @@ class RetroTerminal:
             self.display_individual_analysis()
         
         with tab3:
+            self.display_volatility_surface()
+        
+        with tab4:
             self.display_system_status()
+
+    def display_volatility_surface(self):
+        """Display interactive volatility surface with comprehensive analysis"""
+        
+        st.markdown("""
+        <div class="terminal-box">
+            <div class="terminal-prompt">
+                <span class="glow-green">█</span> INTERACTIVE VOLATILITY SURFACE <span class="glow-green">█</span>
+            </div>
+            <div style="color: #66ff66; font-size: 13px; margin-top: 8px;">
+                Professional options analysis with 3D surface modeling and Greeks
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Control panel
+        st.markdown("""
+        <div class="nav-container">
+            <div class="nav-title">SURFACE ANALYSIS CONTROL PANEL</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
+        
+        with col1:
+            ticker = st.selectbox(
+                "SELECT TICKER FOR SURFACE ANALYSIS", 
+                ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX', 'AMD', 'INTC'],
+                index=0,
+                help="Choose ticker for volatility surface analysis"
+            )
+        
+        with col2:
+            risk_free_rate = st.number_input(
+                "RISK-FREE RATE (%)", 
+                min_value=0.0, 
+                max_value=10.0, 
+                value=5.0,
+                step=0.1
+            ) / 100
+        
+        with col3:
+            # Add interpolation method selector
+            interp_method = st.selectbox(
+                "INTERPOLATION METHOD",
+                ["bicubic", "cubic", "rbf", "kriging", "adaptive"],
+                index=0,
+                help="Choose interpolation method for surface"
+            )
+        
+        with col4:
+            if st.button("ANALYZE SURFACE", use_container_width=True, type="primary"):
+                st.session_state.surface_ticker = ticker
+                st.session_state.surface_rate = risk_free_rate
+                st.session_state.interp_method = interp_method
+        
+        # Add surface type selector below the grid
+        surface_type = st.selectbox(
+            "SURFACE TYPE", 
+            ["IMPLIED VOL", "GREEKS"],
+            help="Choose analysis type"
+        )
+        
+        if hasattr(st.session_state, 'surface_ticker'):
+            self.run_surface_analysis(
+                st.session_state.surface_ticker, 
+                st.session_state.surface_rate,
+                st.session_state.get('interp_method', 'bicubic'),
+                surface_type
+            )
+
+    def fetch_options_data(self, ticker, risk_free_rate=0.05):
+        """Fetch comprehensive options data for surface analysis"""
+        try:
+            stock = yf.Ticker(ticker)
+            
+            # Get stock price data
+            hist = stock.history(period="1y")
+            if hist.empty:
+                return None, None, None
+                
+            current_price = hist['Close'].iloc[-1]
+            
+            # Get options data
+            options_dates = stock.options
+            if not options_dates:
+                return hist, current_price, None
+                
+            # Get options chain for multiple expiries
+            options_data = []
+            for exp_date in options_dates[:8]:  # Get first 8 expiries
+                try:
+                    chain = stock.option_chain(exp_date)
+                    calls = chain.calls
+                    puts = chain.puts
+                    
+                    # Add metadata
+                    calls['expiry'] = exp_date
+                    puts['expiry'] = exp_date
+                    calls['option_type'] = 'call'
+                    puts['option_type'] = 'put'
+                    
+                    options_data.append(calls)
+                    options_data.append(puts)
+                except Exception as e:
+                    continue
+                    
+            options_df = pd.concat(options_data, ignore_index=True) if options_data else None
+            
+            # Apply robust data cleaning
+            if options_df is not None and len(options_df) > 0:
+                try:
+                    # Clean the options data
+                    options_df_clean, cleaning_stats = self.data_cleaner.clean_options_data(
+                        options_df, 
+                        current_price,
+                        outlier_method='iqr',
+                        volume_threshold=1,  # Minimum volume
+                        spread_threshold=0.5,  # Max 50% spread
+                        iv_bounds=(0.01, 3.0),  # Reasonable IV bounds
+                        moneyness_bounds=(0.7, 1.5)  # Focus on near-the-money options
+                    )
+                    
+                    # Store cleaning statistics
+                    st.session_state.cleaning_stats = cleaning_stats
+                    options_df = options_df_clean
+                    
+                except Exception as e:
+                    # If cleaning fails, use original data with basic filtering
+                    st.warning(f"Data cleaning failed, using basic filtering: {str(e)}")
+                    
+            return hist, current_price, options_df
+            
+        except Exception as e:
+            st.error(f"Error fetching options data for {ticker}: {str(e)}")
+            return None, None, None
+
+    def calculate_implied_volatilities(self, options_df, current_price, risk_free_rate=0.05):
+        """Calculate implied volatilities for options chain"""
+        if options_df is None or options_df.empty:
+            return None
+            
+        iv_data = []
+        
+        for _, option in options_df.iterrows():
+            try:
+                # Calculate time to expiry
+                expiry_date = pd.to_datetime(option['expiry'])
+                days_to_expiry = (expiry_date - datetime.now()).days
+                time_to_expiry = days_to_expiry / 365.0
+                
+                if time_to_expiry <= 0:
+                    continue
+                    
+                # Get market price (mid of bid/ask)
+                if pd.isna(option['bid']) or pd.isna(option['ask']):
+                    continue
+                    
+                market_price = (option['bid'] + option['ask']) / 2
+                
+                if market_price <= 0:
+                    continue
+                
+                # Calculate implied volatility
+                option_type = option['option_type']
+                strike = option['strike']
+                
+                try:
+                    iv = implied_volatility(
+                        market_price, current_price, strike, 
+                        time_to_expiry, risk_free_rate, option_type
+                    )
+                    
+                    if iv is not None and 0.01 <= iv <= 5.0:  # Reasonable bounds
+                        iv_data.append({
+                            'strike': strike,
+                            'expiry': option['expiry'],
+                            'time_to_expiry': time_to_expiry,
+                            'implied_volatility': iv,
+                            'option_type': option_type,
+                            'market_price': market_price,
+                            'volume': option.get('volume', 0),
+                            'open_interest': option.get('openInterest', 0)
+                        })
+                except:
+                    continue
+                    
+            except Exception as e:
+                continue
+                
+        return pd.DataFrame(iv_data) if iv_data else None
+
+    def create_interactive_volatility_surface(self, iv_data, interp_method='bicubic'):
+        """Create interactive 3D volatility surface with enhanced interpolation"""
+        if iv_data is None or iv_data.empty:
+            return None
+            
+        # Prepare data for surface
+        strikes = sorted(iv_data['strike'].unique())
+        expiries = sorted(iv_data['time_to_expiry'].unique())
+        
+        if len(strikes) < 3 or len(expiries) < 3:
+            return None
+        
+        # Create meshgrid
+        strike_grid, expiry_grid = np.meshgrid(strikes, expiries)
+        iv_grid = np.full(strike_grid.shape, np.nan)
+        
+        # Fill in the grid with actual IV values
+        for i, expiry in enumerate(expiries):
+            for j, strike in enumerate(strikes):
+                mask = (iv_data['strike'] == strike) & (iv_data['time_to_expiry'] == expiry)
+                if mask.any():
+                    iv_values = iv_data.loc[mask, 'implied_volatility']
+                    iv_grid[i, j] = iv_values.mean()
+        
+        # Interpolate missing values using advanced methods
+        try:
+            # Use advanced interpolation
+            strikes_array = np.array(strikes)
+            expiries_array = np.array(expiries)
+            
+            # Get valid IV data points
+            iv_points = []
+            strike_points = []
+            expiry_points = []
+            
+            for _, row in iv_data.iterrows():
+                iv_points.append(row['implied_volatility'])
+                strike_points.append(row['strike'])
+                expiry_points.append(row['time_to_expiry'])
+            
+            if len(iv_points) > 3:
+                # Use advanced interpolation
+                strike_grid_interp, expiry_grid_interp, iv_grid_interp, quality_metrics = \
+                    self.surface_interpolator.interpolate_surface(
+                        np.array(strike_points),
+                        np.array(expiry_points),
+                        np.array(iv_points),
+                        method=interp_method,
+                        target_strikes=strikes_array,
+                        target_expiries=expiries_array
+                    )
+                
+                # Store quality metrics for display
+                st.session_state.surface_quality = quality_metrics
+                
+                # Use interpolated surface
+                strike_grid = strike_grid_interp
+                expiry_grid = expiry_grid_interp
+                iv_grid_interp = iv_grid_interp
+            else:
+                # Fallback to original method
+                from scipy.interpolate import griddata
+                
+                # Get valid points
+                valid_mask = ~np.isnan(iv_grid)
+                if valid_mask.sum() > 3:
+                    points = np.column_stack((strike_grid[valid_mask], expiry_grid[valid_mask]))
+                    values = iv_grid[valid_mask]
+                    
+                    # Cubic interpolation
+                    iv_grid_interp = griddata(
+                        points, values, 
+                        (strike_grid, expiry_grid), 
+                        method='cubic', 
+                        fill_value=np.nan
+                    )
+                    
+                    # Linear interpolation for remaining NaN values
+                    remaining_nan = np.isnan(iv_grid_interp)
+                    if remaining_nan.any():
+                        iv_grid_linear = griddata(
+                            points, values, 
+                            (strike_grid, expiry_grid), 
+                            method='linear', 
+                            fill_value=np.nanmean(values)
+                        )
+                        iv_grid_interp[remaining_nan] = iv_grid_linear[remaining_nan]
+                else:
+                    iv_grid_interp = iv_grid
+                    
+        except Exception as e:
+            # Fallback to original interpolation
+            from scipy.interpolate import griddata
+            
+            # Get valid points
+            valid_mask = ~np.isnan(iv_grid)
+            if valid_mask.sum() > 3:
+                points = np.column_stack((strike_grid[valid_mask], expiry_grid[valid_mask]))
+                values = iv_grid[valid_mask]
+                
+                # Cubic interpolation
+                iv_grid_interp = griddata(
+                    points, values, 
+                    (strike_grid, expiry_grid), 
+                    method='cubic', 
+                    fill_value=np.nan
+                )
+                
+                # Linear interpolation for remaining NaN values
+                remaining_nan = np.isnan(iv_grid_interp)
+                if remaining_nan.any():
+                    iv_grid_linear = griddata(
+                        points, values, 
+                        (strike_grid, expiry_grid), 
+                        method='linear', 
+                        fill_value=np.nanmean(values)
+                    )
+                    iv_grid_interp[remaining_nan] = iv_grid_linear[remaining_nan]
+            else:
+                iv_grid_interp = iv_grid
+        
+        # Create enhanced 3D surface plot with retro styling
+        fig = go.Figure(data=[
+            go.Surface(
+                x=expiry_grid,
+                y=strike_grid,
+                z=iv_grid_interp,
+                colorscale=[
+                    [0, '#000000'],      # Black
+                    [0.2, '#004400'],    # Dark green
+                    [0.4, '#008800'],    # Medium green
+                    [0.6, '#00ff00'],    # Bright green
+                    [0.8, '#44ff44'],    # Light green
+                    [1, '#88ff88']       # Very light green
+                ],
+                name='Implied Volatility Surface',
+                colorbar=dict(
+                    title="Implied Volatility",
+                    titlefont=dict(color='#00ff00'),
+                    tickfont=dict(color='#00ff00')
+                ),
+                hovertemplate='<b>Time to Expiry</b>: %{x:.3f} years<br>' +
+                             '<b>Strike</b>: $%{y:.2f}<br>' +
+                             '<b>Implied Vol</b>: %{z:.2%}<extra></extra>'
+            )
+        ])
+        
+        fig.update_layout(
+            title={
+                'text': 'INTERACTIVE IMPLIED VOLATILITY SURFACE',
+                'font': {'color': '#00ff00', 'size': 18},
+                'x': 0.5
+            },
+            scene=dict(
+                xaxis=dict(
+                    title='Time to Expiry (Years)',
+                    titlefont=dict(color='#00ff00'),
+                    tickfont=dict(color='#00ff00'),
+                    gridcolor='#004400',
+                    backgroundcolor='#000000'
+                ),
+                yaxis=dict(
+                    title='Strike Price ($)',
+                    titlefont=dict(color='#00ff00'),
+                    tickfont=dict(color='#00ff00'),
+                    gridcolor='#004400',
+                    backgroundcolor='#000000'
+                ),
+                zaxis=dict(
+                    title='Implied Volatility',
+                    titlefont=dict(color='#00ff00'),
+                    tickfont=dict(color='#00ff00'),
+                    gridcolor='#004400',
+                    backgroundcolor='#000000'
+                ),
+                bgcolor='#000000',
+                camera=dict(eye=dict(x=1.5, y=1.5, z=1.5))
+            ),
+            paper_bgcolor='#000000',
+            plot_bgcolor='#000000',
+            width=1000,
+            height=700,
+            margin=dict(r=20, b=10, l=10, t=50)
+        )
+        
+        return fig
+
+    def calculate_comprehensive_greeks(self, current_price, strike, time_to_expiry, volatility, risk_free_rate=0.05):
+        """Calculate comprehensive Greeks analysis"""
+        try:
+            greeks = {}
+            
+            # Calculate for both calls and puts
+            for option_type in ['call', 'put']:
+                # Black-Scholes price
+                price = black_scholes_price(
+                    current_price, strike, time_to_expiry, 
+                    risk_free_rate, volatility, option_type
+                )
+                
+                # All Greeks
+                delta_val = delta(
+                    current_price, strike, time_to_expiry,
+                    risk_free_rate, volatility, option_type
+                )
+                
+                gamma_val = gamma(
+                    current_price, strike, time_to_expiry,
+                    risk_free_rate, volatility
+                )
+                
+                theta_val = theta(
+                    current_price, strike, time_to_expiry,
+                    risk_free_rate, volatility, option_type
+                )
+                
+                vega_val = vega(
+                    current_price, strike, time_to_expiry,
+                    risk_free_rate, volatility
+                )
+                
+                rho_val = rho(
+                    current_price, strike, time_to_expiry,
+                    risk_free_rate, volatility, option_type
+                )
+                
+                greeks[option_type] = {
+                    'price': price,
+                    'delta': delta_val,
+                    'gamma': gamma_val,
+                    'theta': theta_val,
+                    'vega': vega_val,
+                    'rho': rho_val
+                }
+                
+            return greeks
+            
+        except Exception as e:
+            st.error(f"Error calculating Greeks: {str(e)}")
+            return None
+
+    def calculate_greeks_for_heatmap(self, iv_data, current_price, risk_free_rate):
+        """Calculate Greeks for all strikes and expiries for heatmap visualization"""
+        
+        if iv_data is None or iv_data.empty:
+            return None
+        
+        greeks_data = {}
+        
+        try:
+            for _, row in iv_data.iterrows():
+                strike = row['strike']
+                time_to_expiry = row['time_to_expiry']
+                implied_vol = row['implied_volatility']
+                option_type = row['option_type']
+                
+                # Calculate Greeks for this point
+                greeks = self.calculate_comprehensive_greeks(
+                    current_price, strike, time_to_expiry, 
+                    implied_vol, risk_free_rate
+                )
+                
+                if greeks:
+                    key = f"{strike}_{time_to_expiry}_{option_type}"
+                    greeks_data[key] = greeks[option_type]
+            
+            return greeks_data
+            
+        except Exception as e:
+            st.error(f"Error calculating Greeks for heatmap: {str(e)}")
+            return None
+
+    def display_greeks_heatmaps(self, greeks_data, params):
+        """Display Greeks heatmaps based on user selection"""
+        
+        if not greeks_data:
+            st.warning("No Greeks data available for heatmap")
+            return
+        
+        try:
+            # Extract unique strikes and expiries
+            strikes = set()
+            expiries = set()
+            
+            for key in greeks_data.keys():
+                parts = key.split('_')
+                if len(parts) >= 3:
+                    strikes.add(float(parts[0]))
+                    expiries.add(float(parts[1]))
+            
+            strikes = sorted(list(strikes))
+            expiries = sorted(list(expiries))
+            
+            if len(strikes) < 2 or len(expiries) < 2:
+                st.warning("Insufficient data points for heatmap generation")
+                return
+            
+            option_filter = params['option_filter']
+            greek_type = params['greek_type']
+            style = params['style']
+            
+            # Generate appropriate heatmap based on style
+            if style == 'single':
+                # Single Greek heatmap
+                if option_filter == 'both':
+                    # Show both call and put heatmaps side by side
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        fig_call = self.heatmap_generator.create_greeks_heatmap(
+                            strikes, expiries, greeks_data, 
+                            greek_type=greek_type, option_type='call'
+                        )
+                        st.plotly_chart(fig_call, use_container_width=True)
+                    
+                    with col2:
+                        fig_put = self.heatmap_generator.create_greeks_heatmap(
+                            strikes, expiries, greeks_data, 
+                            greek_type=greek_type, option_type='put'
+                        )
+                        st.plotly_chart(fig_put, use_container_width=True)
+                else:
+                    # Single option type heatmap
+                    fig = self.heatmap_generator.create_greeks_heatmap(
+                        strikes, expiries, greeks_data, 
+                        greek_type=greek_type, option_type=option_filter
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+            
+            elif style == 'multi':
+                # Multi-Greek dashboard
+                option_type = option_filter if option_filter != 'both' else 'call'
+                fig_multi = self.heatmap_generator.create_multi_greeks_heatmap(
+                    strikes, expiries, greeks_data, option_type=option_type
+                )
+                st.plotly_chart(fig_multi, use_container_width=True)
+            
+            elif style == 'risk_profile':
+                # Risk profile heatmap
+                spot_range = np.linspace(min(strikes) * 0.8, max(strikes) * 1.2, 20)
+                option_type = option_filter if option_filter != 'both' else 'call'
+                fig_risk = self.heatmap_generator.create_risk_profile_heatmap(
+                    strikes, spot_range, greeks_data, option_type=option_type
+                )
+                st.plotly_chart(fig_risk, use_container_width=True)
+            
+            elif style == 'time_decay':
+                # Time decay heatmap
+                days_range = [int(exp * 365) for exp in expiries if exp > 0]
+                if days_range:
+                    option_type = option_filter if option_filter != 'both' else 'call'
+                    fig_decay = self.heatmap_generator.create_time_decay_heatmap(
+                        strikes, days_range, greeks_data, option_type=option_type
+                    )
+                    st.plotly_chart(fig_decay, use_container_width=True)
+                else:
+                    st.warning("No valid expiry data for time decay analysis")
+            
+        except Exception as e:
+            st.error(f"Error generating heatmap: {str(e)}")
+
+    def run_surface_analysis(self, ticker, risk_free_rate, interp_method, surface_type):
+        """Run comprehensive surface analysis with enhanced interpolation"""
+        
+        st.markdown(f"""
+        <div class="terminal-box">
+            <div class="terminal-prompt">
+                <span class="glow-green">ANALYZING {ticker} VOLATILITY SURFACE</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        with st.spinner(f'LOADING OPTIONS DATA FOR {ticker}...'):
+            hist, current_price, options_df = self.fetch_options_data(ticker, risk_free_rate)
+            
+            if hist is None or options_df is None:
+                st.markdown("""
+                <div class="terminal-box">
+                    <div class="error-text">ERROR: UNABLE TO FETCH OPTIONS DATA</div>
+                    <div style="color: #ff8888; font-size: 12px; margin-top: 8px;">
+                        Check ticker symbol or options availability
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                return
+            
+            # Calculate implied volatilities
+            with st.spinner('CALCULATING IMPLIED VOLATILITIES...'):
+                iv_data = self.calculate_implied_volatilities(options_df, current_price, risk_free_rate)
+            
+            if iv_data is None or iv_data.empty:
+                st.warning("No valid implied volatility data found")
+                return
+            
+            # Display current metrics
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                st.metric("CURRENT PRICE", f"${current_price:.2f}")
+            
+            with col2:
+                change = hist['Close'].iloc[-1] - hist['Close'].iloc[-2]
+                st.metric("DAILY CHANGE", f"${change:.2f}", f"{change/hist['Close'].iloc[-2]*100:.2f}%")
+            
+            with col3:
+                hist_vol = hist['Close'].pct_change().std() * np.sqrt(252)
+                st.metric("HISTORICAL VOL", f"{hist_vol:.2%}")
+            
+            with col4:
+                avg_iv = iv_data['implied_volatility'].mean()
+                st.metric("AVG IMPLIED VOL", f"{avg_iv:.2%}")
+            
+            # Surface analysis tabs
+            surf_tab1, surf_tab2, surf_tab3, surf_tab4, surf_tab5 = st.tabs([
+                "3D VOLATILITY SURFACE",
+                "GREEKS HEATMAPS", 
+                "OPTIONS CHAIN DATA",
+                "PRICE ANALYSIS",
+                "SURFACE QUALITY"
+            ])
+            
+            with surf_tab1:
+                st.markdown("""
+                <div style="background: linear-gradient(90deg, #000800 0%, #001400 50%, #000800 100%); 
+                            border: 1px solid #00ff41; border-radius: 8px; padding: 15px; margin: 15px 0;">
+                    <div style="color: #00ff41; font-weight: bold; text-align: center;">
+                        INTERACTIVE 3D VOLATILITY SURFACE
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                surface_fig = self.create_interactive_volatility_surface(iv_data, interp_method)
+                if surface_fig:
+                    st.plotly_chart(surface_fig, use_container_width=True)
+                else:
+                    st.warning("Insufficient data points for 3D surface generation")
+            
+            with surf_tab2:
+                st.markdown("""
+                <div style="background: linear-gradient(90deg, #000800 0%, #001400 50%, #000800 100%); 
+                            border: 1px solid #00ff41; border-radius: 8px; padding: 15px; margin: 15px 0;">
+                    <div style="color: #00ff41; font-weight: bold; text-align: center;">
+                        COMPREHENSIVE GREEKS HEATMAP ANALYSIS
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Greeks heatmap controls
+                hm_col1, hm_col2, hm_col3, hm_col4 = st.columns(4)
+                
+                with hm_col1:
+                    option_filter = st.selectbox(
+                        "OPTION TYPE",
+                        ["call", "put", "both"],
+                        index=0,
+                        help="Filter by option type"
+                    )
+                
+                with hm_col2:
+                    greek_type = st.selectbox(
+                        "GREEK TYPE",
+                        ["delta", "gamma", "theta", "vega", "rho"],
+                        index=0,
+                        help="Select Greek for heatmap"
+                    )
+                
+                with hm_col3:
+                    heatmap_style = st.selectbox(
+                        "HEATMAP STYLE",
+                        ["single", "multi", "risk_profile", "time_decay"],
+                        index=0,
+                        help="Choose heatmap visualization style"
+                    )
+                
+                with hm_col4:
+                    if st.button("GENERATE HEATMAP", use_container_width=True):
+                        # Calculate Greeks for heatmap
+                        heatmap_data = self.calculate_greeks_for_heatmap(
+                            iv_data, current_price, risk_free_rate
+                        )
+                        
+                        if heatmap_data:
+                            st.session_state.heatmap_data = heatmap_data
+                            st.session_state.heatmap_params = {
+                                'option_filter': option_filter,
+                                'greek_type': greek_type,
+                                'style': heatmap_style
+                            }
+                
+                # Display heatmaps if data exists
+                if hasattr(st.session_state, 'heatmap_data'):
+                    self.display_greeks_heatmaps(
+                        st.session_state.heatmap_data,
+                        st.session_state.heatmap_params
+                    )
+            
+            with surf_tab3:
+                st.markdown("""
+                <div style="background: linear-gradient(90deg, #000800 0%, #001400 50%, #000800 100%); 
+                            border: 1px solid #00ff41; border-radius: 8px; padding: 15px; margin: 15px 0;">
+                    <div style="color: #00ff41; font-weight: bold; text-align: center;">
+                        OPTIONS CHAIN DATA
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Display formatted options data
+                display_cols = ['strike', 'expiry', 'time_to_expiry', 
+                              'implied_volatility', 'option_type', 'market_price']
+                
+                if not iv_data.empty:
+                    iv_display = iv_data[display_cols].sort_values(['expiry', 'strike']).copy()
+                    iv_display['implied_volatility'] = iv_display['implied_volatility'].apply(lambda x: f"{x:.2%}")
+                    iv_display['market_price'] = iv_display['market_price'].apply(lambda x: f"${x:.2f}")
+                    iv_display['time_to_expiry'] = iv_display['time_to_expiry'].apply(lambda x: f"{x:.3f}")
+                    iv_display.columns = ['STRIKE', 'EXPIRY', 'TIME_TO_EXP', 'IMPLIED_VOL', 'TYPE', 'PRICE']
+                    
+                    st.dataframe(iv_display, use_container_width=True, hide_index=True)
+            
+            with surf_tab4:
+                st.markdown("""
+                <div style="background: linear-gradient(90deg, #000800 0%, #001400 50%, #000800 100%); 
+                            border: 1px solid #00ff41; border-radius: 8px; padding: 15px; margin: 15px 0;">
+                    <div style="color: #00ff41; font-weight: bold; text-align: center;">
+                        STOCK PRICE ANALYSIS
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Create retro-styled price chart
+                price_fig = go.Figure()
+                price_fig.add_trace(
+                    go.Scatter(
+                        x=hist.index,
+                        y=hist['Close'],
+                        mode='lines',
+                        name='Close Price',
+                        line=dict(color='#00ff00', width=2)
+                    )
+                )
+                
+                price_fig.update_layout(
+                    title={
+                        'text': f'{ticker} STOCK PRICE ANALYSIS',
+                        'font': {'color': '#00ff00', 'size': 16},
+                        'x': 0.5
+                    },
+                    xaxis=dict(
+                        title='Date',
+                        titlefont=dict(color='#00ff00'),
+                        tickfont=dict(color='#00ff00'),
+                        gridcolor='#004400'
+                    ),
+                    yaxis=dict(
+                        title='Price ($)',
+                        titlefont=dict(color='#00ff00'),
+                        tickfont=dict(color='#00ff00'),
+                        gridcolor='#004400'
+                    ),
+                    paper_bgcolor='#000000',
+                    plot_bgcolor='#000000',
+                    height=400
+                )
+                
+                st.plotly_chart(price_fig, use_container_width=True)
+            
+            with surf_tab5:
+                st.markdown("""
+                <div style="background: linear-gradient(90deg, #000800 0%, #001400 50%, #000800 100%); 
+                            border: 1px solid #00ff41; border-radius: 8px; padding: 15px; margin: 15px 0;">
+                    <div style="color: #00ff41; font-weight: bold; text-align: center;">
+                        SURFACE QUALITY METRICS
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Display surface quality metrics
+                if hasattr(st.session_state, 'surface_quality'):
+                    quality = st.session_state.surface_quality
+                    
+                    # Quality metrics in columns
+                    q_col1, q_col2, q_col3 = st.columns(3)
+                    
+                    with q_col1:
+                        st.markdown("**INTERPOLATION ACCURACY**")
+                        if 'rmse' in quality:
+                            st.metric("RMSE", f"{quality['rmse']:.6f}")
+                        if 'mae' in quality:
+                            st.metric("MAE", f"{quality['mae']:.6f}")
+                        if 'r_squared' in quality:
+                            st.metric("R²", f"{quality['r_squared']:.4f}")
+                    
+                    with q_col2:
+                        st.markdown("**SURFACE PROPERTIES**")
+                        if 'smoothness' in quality:
+                            st.metric("SMOOTHNESS", f"{quality['smoothness']:.6f}")
+                        if 'data_coverage' in quality:
+                            st.metric("DATA COVERAGE", f"{quality['data_coverage']:.2%}")
+                        if 'nan_ratio' in quality:
+                            st.metric("NaN RATIO", f"{quality['nan_ratio']:.2%}")
+                    
+                    with q_col3:
+                        st.markdown("**GRID INFORMATION**")
+                        if 'grid_size' in quality:
+                            st.metric("GRID SIZE", f"{quality['grid_size'][0]}×{quality['grid_size'][1]}")
+                        if 'max_error' in quality:
+                            st.metric("MAX ERROR", f"{quality['max_error']:.6f}")
+                        
+                        # Interpolation method used
+                        method_used = st.session_state.get('interp_method', 'bicubic')
+                        st.markdown(f"**METHOD:** {method_used.upper()}")
+                        
+                        # Data cleaning statistics
+                        if hasattr(st.session_state, 'cleaning_stats'):
+                            clean_stats = st.session_state.cleaning_stats
+                            st.markdown("**DATA CLEANING:**")
+                            st.metric("REMOVAL RATE", f"{clean_stats['removal_rate']:.1%}")
+                            st.metric("QUALITY SCORE", f"{clean_stats['data_quality_score']:.2f}")
+                else:
+                    st.info("Run surface analysis to see quality metrics")
 
     def display_system_status(self):
         """Display system status information"""
