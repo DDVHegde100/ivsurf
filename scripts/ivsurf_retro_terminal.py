@@ -36,7 +36,9 @@ from core.advanced_interpolation import AdvancedSurfaceInterpolator, SurfaceSmoo
 from core.gaussian_process import VolatilitySurfaceGP
 from core.surface_smoothing import SurfaceSmoothingEngine, smooth_volatility_surface
 from core.stochastic_vol import StochasticVolatilityEngine, create_heston_model, create_sabr_model
+from core.jump_models import JumpModelEngine, JumpDetector, detect_jumps_in_series, create_jump_engine
 from models.heston_advanced import HestonAdvanced, HestonParameters, SimulationScheme
+from models.jump_diffusion import MertonJumpDiffusion, KouJumpDiffusion, MertonParameters, KouParameters, create_merton_model, create_kou_model
 from visuals.plot_surface import plot_vol_surface_plotly
 from visuals.heatmap_greeks import GreeksHeatmapGenerator
 from utils.data_cleaning import OptionsDataCleaner
@@ -56,6 +58,11 @@ class RetroTerminal:
         self.sv_engine = StochasticVolatilityEngine()
         self.heston_model = None
         self.sabr_model = None
+        
+        # Initialize Jump Models Engine
+        self.jump_engine = create_jump_engine()
+        self.merton_model = None
+        self.kou_model = None
         
         # Expanded ticker universe - NASDAQ focus for maximum opportunities
         self.nasdaq_tickers = [
@@ -2460,13 +2467,14 @@ class RetroTerminal:
                 st.metric("AVG IMPLIED VOL", f"{avg_iv:.2%}")
             
             # Surface analysis tabs
-            surf_tab1, surf_tab2, surf_tab3, surf_tab4, surf_tab5, surf_tab6 = st.tabs([
+            surf_tab1, surf_tab2, surf_tab3, surf_tab4, surf_tab5, surf_tab6, surf_tab7 = st.tabs([
                 "3D VOLATILITY SURFACE",
                 "GREEKS HEATMAPS", 
                 "OPTIONS CHAIN DATA",
                 "PRICE ANALYSIS",
                 "SURFACE QUALITY",
-                "HESTON MODEL"
+                "HESTON MODEL",
+                "JUMP MODELS"
             ])
             
             with surf_tab1:
@@ -3163,6 +3171,534 @@ class RetroTerminal:
                 
                 else:
                     st.info("Configure Heston parameters above and click 'RUN HESTON MODEL' to begin analysis.")
+            
+            with surf_tab7:
+                st.markdown("""
+                <div style="background: linear-gradient(90deg, #000800 0%, #001400 50%, #000800 100%); 
+                            border: 1px solid #00ff41; border-radius: 8px; padding: 15px; margin: 15px 0;">
+                    <div style="color: #00ff41; font-weight: bold; text-align: center;">
+                        JUMP-DIFFUSION MODELS (MERTON & KOU)
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Jump model selection and controls
+                jump_col1, jump_col2 = st.columns(2)
+                
+                with jump_col1:
+                    st.markdown("**MODEL SELECTION**")
+                    
+                    # Model type selection
+                    jump_model_type = st.selectbox(
+                        "Jump Model Type",
+                        ["Merton Jump-Diffusion", "Kou Double Exponential"],
+                        index=0
+                    )
+                    
+                    # Common parameters
+                    st.markdown("**DIFFUSION PARAMETERS**")
+                    mu_jump = st.slider("Drift Rate (μ)", -0.2, 0.3, 0.05, 0.01)
+                    sigma_jump = st.slider("Diffusion Vol (σ)", 0.05, 1.0, 0.2, 0.01)
+                    lambda_jump = st.slider("Jump Intensity (λ)", 0.0, 20.0, 2.0, 0.5)
+                    
+                    # Model-specific parameters
+                    if jump_model_type == "Merton Jump-Diffusion":
+                        st.markdown("**MERTON JUMP PARAMETERS**")
+                        mu_j = st.slider("Mean Jump Size (μⱼ)", -0.5, 0.5, -0.1, 0.01)
+                        sigma_j = st.slider("Jump Volatility (σⱼ)", 0.05, 1.0, 0.3, 0.01)
+                        
+                        # Display expected jump size
+                        expected_jump = np.exp(mu_j + 0.5 * sigma_j**2) - 1
+                        st.metric("Expected Jump Size", f"{expected_jump:.2%}")
+                    
+                    else:  # Kou model
+                        st.markdown("**KOU JUMP PARAMETERS**")
+                        p_kou = st.slider("Upward Jump Prob (p)", 0.01, 0.99, 0.4, 0.01)
+                        eta_u = st.slider("Upward Rate (η₊)", 1.1, 20.0, 3.0, 0.1)
+                        eta_d = st.slider("Downward Rate (η₋)", 1.1, 20.0, 4.0, 0.1)
+                        
+                        # Display expected jump size
+                        expected_jump_kou = p_kou * eta_u / (eta_u - 1) + (1 - p_kou) * eta_d / (eta_d + 1) - 1
+                        st.metric("Expected Jump Size", f"{expected_jump_kou:.2%}")
+                
+                with jump_col2:
+                    st.markdown("**MODEL ACTIONS**")
+                    
+                    run_jump_model = st.button("🚀 RUN JUMP MODEL", type="primary")
+                    calibrate_jump = st.checkbox("Calibrate to Market Data", value=False)
+                    monte_carlo_jump = st.checkbox("Monte Carlo Simulation", value=True)
+                    
+                    # Jump analysis options
+                    st.markdown("**ANALYSIS OPTIONS**")
+                    detect_historical_jumps = st.checkbox("Detect Historical Jumps", value=True)
+                    jump_scenarios = st.checkbox("Jump Scenario Analysis", value=True)
+                    risk_decomposition = st.checkbox("Risk Premium Decomposition", value=True)
+                    
+                    # Simulation parameters
+                    mc_paths_jump = st.selectbox("MC Paths", [1000, 5000, 10000], index=1)
+                    scenario_count = st.selectbox("Scenarios", [100, 500, 1000], index=1)
+                
+                if run_jump_model and options_df is not None:
+                    try:
+                        # Create jump model based on selection
+                        if jump_model_type == "Merton Jump-Diffusion":
+                            jump_params = MertonParameters(
+                                mu=mu_jump, sigma=sigma_jump, lambda_j=lambda_jump,
+                                mu_j=mu_j, sigma_j=sigma_j
+                            )
+                            self.merton_model = MertonJumpDiffusion(jump_params, current_price, risk_free_rate)
+                            current_jump_model = self.merton_model
+                            self.jump_engine.register_model("Merton", self.merton_model)
+                            model_name = "Merton"
+                        else:
+                            jump_params = KouParameters(
+                                mu=mu_jump, sigma=sigma_jump, lambda_j=lambda_jump,
+                                p=p_kou, eta_u=eta_u, eta_d=eta_d
+                            )
+                            self.kou_model = KouJumpDiffusion(jump_params, current_price, risk_free_rate)
+                            current_jump_model = self.kou_model
+                            self.jump_engine.register_model("Kou", self.kou_model)
+                            model_name = "Kou"
+                        
+                        st.success(f"✅ {jump_model_type} initialized successfully!")
+                        
+                        # Display model parameters
+                        st.markdown("**INITIALIZED PARAMETERS:**")
+                        param_col1, param_col2, param_col3 = st.columns(3)
+                        
+                        with param_col1:
+                            st.metric("Drift (μ)", f"{mu_jump:.3f}")
+                            st.metric("Diffusion Vol (σ)", f"{sigma_jump:.3f}")
+                        
+                        with param_col2:
+                            st.metric("Jump Intensity (λ)", f"{lambda_jump:.2f}")
+                            if jump_model_type == "Merton Jump-Diffusion":
+                                st.metric("Mean Jump (μⱼ)", f"{mu_j:.3f}")
+                            else:
+                                st.metric("Upward Prob (p)", f"{p_kou:.2f}")
+                        
+                        with param_col3:
+                            st.metric("Current Price (S₀)", f"${current_price:.2f}")
+                            annual_jump_prob = 1 - np.exp(-lambda_jump)
+                            st.metric("Annual Jump Prob", f"{annual_jump_prob:.1%}")
+                        
+                        if calibrate_jump:
+                            st.markdown("**CALIBRATION TO MARKET DATA**")
+                            with st.spinner("Calibrating jump model to market data..."):
+                                try:
+                                    # Prepare market data for calibration
+                                    calibration_data = options_df.copy()
+                                    calibration_data['price'] = (calibration_data['bid'] + calibration_data['ask']) / 2
+                                    calibration_data['option_type'] = calibration_data['type'].str.lower()
+                                    
+                                    # Filter for liquid options
+                                    calibration_data = calibration_data[
+                                        (calibration_data['bid'] > 0.01) & 
+                                        (calibration_data['ask'] > 0) &
+                                        (calibration_data['volume'] > 5)
+                                    ].head(15)  # Limit for performance
+                                    
+                                    if len(calibration_data) > 3:
+                                        calibration_result = current_jump_model.calibrate_to_market(calibration_data)
+                                        
+                                        if calibration_result.convergence:
+                                            st.success("🎯 Jump model calibration converged!")
+                                            
+                                            # Display calibration results
+                                            calib_col1, calib_col2, calib_col3 = st.columns(3)
+                                            
+                                            with calib_col1:
+                                                st.metric("RMSE", f"{calibration_result.rmse:.6f}")
+                                                st.metric("MAE", f"{calibration_result.mae:.6f}")
+                                            
+                                            with calib_col2:
+                                                st.metric("Max Error", f"{calibration_result.max_error:.6f}")
+                                                st.metric("Iterations", calibration_result.iterations)
+                                            
+                                            with calib_col3:
+                                                st.metric("Jump Intensity", f"{calibration_result.jump_intensity:.2f}")
+                                                st.metric("Jump Probability", f"{calibration_result.jump_probability:.1%}")
+                                            
+                                            # Update model with calibrated parameters
+                                            if jump_model_type == "Merton Jump-Diffusion":
+                                                self.merton_model = MertonJumpDiffusion(
+                                                    calibration_result.parameters, current_price, risk_free_rate
+                                                )
+                                                current_jump_model = self.merton_model
+                                                self.jump_engine.register_model("Merton", self.merton_model)
+                                            else:
+                                                self.kou_model = KouJumpDiffusion(
+                                                    calibration_result.parameters, current_price, risk_free_rate
+                                                )
+                                                current_jump_model = self.kou_model
+                                                self.jump_engine.register_model("Kou", self.kou_model)
+                                        else:
+                                            st.warning("⚠ Calibration did not converge. Using manual parameters.")
+                                    else:
+                                        st.warning("Insufficient liquid options for calibration.")
+                                except Exception as e:
+                                    st.error(f"Calibration failed: {str(e)}")
+                        
+                        # Historical jump detection
+                        if detect_historical_jumps:
+                            st.markdown("**HISTORICAL JUMP DETECTION**")
+                            
+                            with st.spinner("Analyzing historical price data for jumps..."):
+                                try:
+                                    # Get historical data
+                                    hist, _, _ = self.fetch_options_data(ticker, risk_free_rate)
+                                    if hist is not None and len(hist) > 50:
+                                        prices = hist['Close'].values
+                                        
+                                        # Detect jumps
+                                        detected_jumps = detect_jumps_in_series(prices, 'threshold')
+                                        
+                                        if detected_jumps:
+                                            jump_stats_col1, jump_stats_col2, jump_stats_col3 = st.columns(3)
+                                            
+                                            with jump_stats_col1:
+                                                st.metric("Detected Jumps", len(detected_jumps))
+                                                upward_jumps = sum(1 for j in detected_jumps if j.direction == 'up')
+                                                st.metric("Upward Jumps", upward_jumps)
+                                            
+                                            with jump_stats_col2:
+                                                jump_returns = [j.jump_return for j in detected_jumps]
+                                                mean_jump = np.mean(jump_returns)
+                                                st.metric("Mean Jump Size", f"{mean_jump:.2%}")
+                                                jump_vol = np.std(jump_returns)
+                                                st.metric("Jump Volatility", f"{jump_vol:.2%}")
+                                            
+                                            with jump_stats_col3:
+                                                # Estimate annual frequency
+                                                days = len(prices)
+                                                annual_frequency = len(detected_jumps) * 252 / days
+                                                st.metric("Annual Frequency", f"{annual_frequency:.1f}")
+                                                upward_prob = upward_jumps / len(detected_jumps)
+                                                st.metric("Upward Prob", f"{upward_prob:.1%}")
+                                            
+                                            # Jump timeline visualization
+                                            jump_timeline_data = []
+                                            for i, jump in enumerate(detected_jumps[:10]):  # Show recent 10
+                                                jump_timeline_data.append({
+                                                    'Jump': i + 1,
+                                                    'Size': jump.jump_return * 100,
+                                                    'Direction': jump.direction,
+                                                    'Significance': jump.significance
+                                                })
+                                            
+                                            if jump_timeline_data:
+                                                st.markdown("**RECENT JUMP EVENTS**")
+                                                jump_df = pd.DataFrame(jump_timeline_data)
+                                                st.dataframe(jump_df, use_container_width=True)
+                                        else:
+                                            st.info("No significant jumps detected in historical data")
+                                    else:
+                                        st.warning("Insufficient historical data for jump detection")
+                                except Exception as e:
+                                    st.error(f"Jump detection failed: {str(e)}")
+                        
+                        # Jump option pricing comparison
+                        st.markdown("**JUMP MODEL OPTION PRICING**")
+                        
+                        # Select strikes for analysis
+                        available_strikes = sorted(options_df['strike'].unique())[:10]
+                        if len(available_strikes) > 0:
+                            selected_expiry = sorted(options_df['expiry'].unique())[0]
+                            
+                            # Calculate prices
+                            jump_prices = []
+                            bs_prices = []
+                            market_prices = []
+                            
+                            for strike in available_strikes:
+                                # Jump model price
+                                jump_call = current_jump_model.option_price(strike, selected_expiry, 'call')[0]
+                                jump_prices.append(jump_call)
+                                
+                                # Black-Scholes comparison
+                                market_iv = 0.2  # Default
+                                option_subset = options_df[
+                                    (options_df['strike'] == strike) & 
+                                    (np.abs(options_df['expiry'] - selected_expiry) < 0.01)
+                                ]
+                                if len(option_subset) > 0:
+                                    market_price = (option_subset['bid'].iloc[0] + option_subset['ask'].iloc[0]) / 2
+                                    market_prices.append(market_price)
+                                else:
+                                    market_prices.append(np.nan)
+                                
+                                bs_price = black_scholes_price(
+                                    current_price, strike, selected_expiry, 
+                                    risk_free_rate, market_iv, 'call'
+                                )
+                                bs_prices.append(bs_price)
+                            
+                            # Price comparison table
+                            price_comparison = pd.DataFrame({
+                                'Strike': available_strikes,
+                                f'{jump_model_type}': jump_prices,
+                                'Black-Scholes': bs_prices,
+                                'Market Price': market_prices,
+                                'Jump Premium': np.array(jump_prices) - np.array(bs_prices)
+                            })
+                            
+                            st.markdown("**PRICE COMPARISON TABLE**")
+                            st.dataframe(price_comparison.round(4), use_container_width=True)
+                            
+                            # Price comparison chart
+                            fig_jump_prices = go.Figure()
+                            
+                            fig_jump_prices.add_trace(go.Scatter(
+                                x=available_strikes, y=jump_prices,
+                                mode='lines+markers', name=jump_model_type,
+                                line=dict(color='#00ff41', width=2),
+                                marker=dict(size=6)
+                            ))
+                            
+                            fig_jump_prices.add_trace(go.Scatter(
+                                x=available_strikes, y=bs_prices,
+                                mode='lines+markers', name='Black-Scholes',
+                                line=dict(color='#ff6b35', width=2, dash='dash'),
+                                marker=dict(size=6)
+                            ))
+                            
+                            if not all(np.isnan(market_prices)):
+                                fig_jump_prices.add_trace(go.Scatter(
+                                    x=available_strikes, y=market_prices,
+                                    mode='markers', name='Market Prices',
+                                    marker=dict(color='#ffff00', size=8, symbol='x')
+                                ))
+                            
+                            fig_jump_prices.update_layout(
+                                title=f"{jump_model_type} vs Black-Scholes Option Prices",
+                                xaxis_title="Strike Price",
+                                yaxis_title="Option Price",
+                                template="plotly_dark",
+                                paper_bgcolor='black',
+                                plot_bgcolor='black',
+                                font=dict(color='#00ff41')
+                            )
+                            
+                            st.plotly_chart(fig_jump_prices, use_container_width=True)
+                        
+                        # Monte Carlo simulation with jumps
+                        if monte_carlo_jump:
+                            st.markdown("**MONTE CARLO SIMULATION WITH JUMPS**")
+                            
+                            with st.spinner(f"Running jump-diffusion simulation ({mc_paths_jump:,} paths)..."):
+                                try:
+                                    # Run MC simulation
+                                    mc_time = 1.0
+                                    mc_steps = 252
+                                    
+                                    S_paths, jump_info = current_jump_model.simulate_paths(
+                                        mc_time, mc_steps, mc_paths_jump
+                                    )
+                                    
+                                    # MC results
+                                    mc_col1, mc_col2, mc_col3, mc_col4 = st.columns(4)
+                                    
+                                    with mc_col1:
+                                        final_prices = S_paths[:, -1]
+                                        st.metric("Final S Mean", f"${np.mean(final_prices):.2f}")
+                                        st.metric("Final S Std", f"${np.std(final_prices):.2f}")
+                                    
+                                    with mc_col2:
+                                        returns = (final_prices / current_price - 1) * 100
+                                        st.metric("Return Mean", f"{np.mean(returns):.1f}%")
+                                        st.metric("Return Std", f"{np.std(returns):.1f}%")
+                                    
+                                    with mc_col3:
+                                        # Jump statistics
+                                        total_jumps = len(jump_info)
+                                        avg_jumps_per_path = total_jumps / mc_paths_jump if mc_paths_jump > 0 else 0
+                                        st.metric("Total Jump Events", total_jumps)
+                                        st.metric("Avg Jumps/Path", f"{avg_jumps_per_path:.2f}")
+                                    
+                                    with mc_col4:
+                                        # Risk metrics
+                                        var_95 = np.percentile(returns, 5)
+                                        max_gain = np.max(returns)
+                                        st.metric("VaR (95%)", f"{var_95:.1f}%")
+                                        st.metric("Max Gain", f"{max_gain:.1f}%")
+                                    
+                                    # Plot sample paths with jump indicators
+                                    n_plot_paths = min(50, mc_paths_jump)
+                                    time_grid = np.linspace(0, mc_time, mc_steps + 1)
+                                    
+                                    fig_mc_jump = go.Figure()
+                                    
+                                    # Plot sample price paths
+                                    for i in range(0, n_plot_paths, 3):
+                                        fig_mc_jump.add_trace(go.Scatter(
+                                            x=time_grid,
+                                            y=S_paths[i, :],
+                                            mode='lines',
+                                            line=dict(color='#00ff41', width=0.8, opacity=0.4),
+                                            showlegend=False
+                                        ))
+                                    
+                                    # Add mean path
+                                    mean_path = np.mean(S_paths[:n_plot_paths], axis=0)
+                                    fig_mc_jump.add_trace(go.Scatter(
+                                        x=time_grid,
+                                        y=mean_path,
+                                        mode='lines',
+                                        name='Mean Path',
+                                        line=dict(color='#ff6b35', width=3)
+                                    ))
+                                    
+                                    # Mark jump events
+                                    if jump_info:
+                                        jump_times = [j['time'] for j in jump_info[:20]]  # First 20 jumps
+                                        jump_prices = [mean_path[int(j['time']*mc_steps)] for j in jump_info[:20]]
+                                        
+                                        fig_mc_jump.add_trace(go.Scatter(
+                                            x=jump_times,
+                                            y=jump_prices,
+                                            mode='markers',
+                                            name='Jump Events',
+                                            marker=dict(color='#ffff00', size=8, symbol='star')
+                                        ))
+                                    
+                                    fig_mc_jump.update_layout(
+                                        title=f"{jump_model_type} Monte Carlo Simulation",
+                                        xaxis_title="Time (Years)",
+                                        yaxis_title="Stock Price",
+                                        template="plotly_dark",
+                                        paper_bgcolor='black',
+                                        plot_bgcolor='black',
+                                        font=dict(color='#00ff41')
+                                    )
+                                    
+                                    st.plotly_chart(fig_mc_jump, use_container_width=True)
+                                    
+                                except Exception as e:
+                                    st.error(f"Monte Carlo simulation failed: {str(e)}")
+                        
+                        # Jump scenario analysis
+                        if jump_scenarios:
+                            st.markdown("**JUMP SCENARIO ANALYSIS**")
+                            
+                            with st.spinner("Generating jump scenarios..."):
+                                try:
+                                    scenarios = self.jump_engine.generate_jump_scenarios(
+                                        model_name, scenario_count, 1.0
+                                    )
+                                    
+                                    # Scenario statistics
+                                    scenario_col1, scenario_col2, scenario_col3, scenario_col4 = st.columns(4)
+                                    
+                                    with scenario_col1:
+                                        st.metric("Mean Return", f"{scenarios['total_return'].mean():.1f}%")
+                                        st.metric("Return Volatility", f"{scenarios['total_return'].std():.1f}%")
+                                    
+                                    with scenario_col2:
+                                        st.metric("Mean Max Drawdown", f"{scenarios['max_drawdown'].mean():.1f}%")
+                                        st.metric("Worst Drawdown", f"{scenarios['max_drawdown'].min():.1f}%")
+                                    
+                                    with scenario_col3:
+                                        st.metric("Avg Jumps/Scenario", f"{scenarios['jump_count'].mean():.1f}")
+                                        st.metric("Max Jumps", f"{scenarios['jump_count'].max()}")
+                                    
+                                    with scenario_col4:
+                                        best_return = scenarios['total_return'].max()
+                                        worst_return = scenarios['total_return'].min()
+                                        st.metric("Best Return", f"{best_return:.1f}%")
+                                        st.metric("Worst Return", f"{worst_return:.1f}%")
+                                    
+                                    # Scenario distribution chart
+                                    fig_scenarios = go.Figure()
+                                    
+                                    fig_scenarios.add_trace(go.Histogram(
+                                        x=scenarios['total_return'],
+                                        nbinsx=30,
+                                        name='Return Distribution',
+                                        marker=dict(color='#00ff41', opacity=0.7),
+                                        histnorm='probability'
+                                    ))
+                                    
+                                    fig_scenarios.update_layout(
+                                        title="Jump Scenario Return Distribution",
+                                        xaxis_title="Total Return (%)",
+                                        yaxis_title="Probability",
+                                        template="plotly_dark",
+                                        paper_bgcolor='black',
+                                        plot_bgcolor='black',
+                                        font=dict(color='#00ff41')
+                                    )
+                                    
+                                    st.plotly_chart(fig_scenarios, use_container_width=True)
+                                    
+                                except Exception as e:
+                                    st.error(f"Scenario analysis failed: {str(e)}")
+                        
+                        # Risk premium decomposition
+                        if risk_decomposition:
+                            st.markdown("**RISK PREMIUM DECOMPOSITION**")
+                            
+                            try:
+                                risk_premium = self.jump_engine.decompose_risk_premium(model_name)
+                                
+                                # Risk premium breakdown
+                                risk_col1, risk_col2, risk_col3 = st.columns(3)
+                                
+                                with risk_col1:
+                                    st.metric("Total Risk Premium", f"{risk_premium.total_premium:.2%}")
+                                    st.metric("Diffusion Premium", f"{risk_premium.diffusion_premium:.2%}")
+                                
+                                with risk_col2:
+                                    st.metric("Jump Premium", f"{risk_premium.jump_premium:.2%}")
+                                    st.metric("Jump Intensity Premium", f"{risk_premium.jump_intensity_premium:.2%}")
+                                
+                                with risk_col3:
+                                    st.metric("Jump Size Premium", f"{risk_premium.jump_size_premium:.2%}")
+                                    jump_contribution = risk_premium.jump_premium / risk_premium.total_premium * 100
+                                    st.metric("Jump Contribution", f"{jump_contribution:.1f}%")
+                                
+                            except Exception as e:
+                                st.error(f"Risk decomposition failed: {str(e)}")
+                        
+                        # Jump-adjusted Greeks
+                        st.markdown("**JUMP-ADJUSTED GREEKS**")
+                        
+                        try:
+                            # Calculate jump-adjusted Greeks for ATM option
+                            atm_strike = current_price
+                            available_expiries = sorted(options_df['expiry'].unique())
+                            if available_expiries:
+                                selected_expiry = available_expiries[0]
+                                
+                                jump_greeks = self.jump_engine.calculate_jump_adjusted_greeks(
+                                    model_name, atm_strike, selected_expiry, 'call'
+                                )
+                                
+                                greeks_col1, greeks_col2, greeks_col3 = st.columns(3)
+                                
+                                with greeks_col1:
+                                    st.metric("Delta (Δ)", f"{jump_greeks['delta']:.4f}")
+                                    st.metric("Gamma (Γ)", f"{jump_greeks['gamma']:.6f}")
+                                
+                                with greeks_col2:
+                                    st.metric("Theta (Θ)", f"{jump_greeks['theta']:.4f}")
+                                    st.metric("Lambda (λ)", f"{jump_greeks['lambda']:.4f}")
+                                
+                                with greeks_col3:
+                                    st.metric("Jump Vega", f"{jump_greeks['jump_vega']:.4f}")
+                                    st.metric("Option Price", f"${jump_greeks['price']:.4f}")
+                        
+                        except Exception as e:
+                            st.error(f"Jump Greeks calculation failed: {str(e)}")
+                        
+                    except Exception as e:
+                        st.error(f"Jump model initialization failed: {str(e)}")
+                        st.error("Please check your parameters and try again.")
+                
+                elif run_jump_model and options_df is None:
+                    st.warning("Please load options data first by analyzing a ticker in the Surface Analysis tab.")
+                
+                else:
+                    st.info("Configure jump model parameters above and click 'RUN JUMP MODEL' to begin analysis.")
 
     def display_system_status(self):
         """Display system status information"""
