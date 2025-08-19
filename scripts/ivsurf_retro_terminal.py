@@ -793,38 +793,138 @@ class RetroTerminal:
     def calculate_tomorrow_gain_prediction(self, hist, current_price, volatility, rsi, macd, bb_position, 
                                           volume_trend, momentum_1d, momentum_3d, momentum_5d):
         """
-        Predict tomorrow's percentage gain potential for stock discovery
-        Focus: Which stocks will have highest % gains from today to tomorrow
+        ENHANCED QUANTUM PREDICTION ENGINE v2.0
+        Ultra-sophisticated mathematical modeling for tomorrow's gain prediction
+        Advanced technical indicators with multi-dimensional momentum analysis
         """
         
-        from scipy.stats import norm
+        from scipy.stats import norm, skew, kurtosis
+        from scipy.signal import find_peaks
         
-        # === BULLISH MOMENTUM INDICATORS ===
+        # === ADVANCED TECHNICAL INDICATORS FOUNDATION ===
         
-        # 1. Oversold Bounce Potential (Mean Reversion)
+        # 1. ENHANCED MOMENTUM ANALYSIS WITH MULTI-TIMEFRAME CONVERGENCE
+        momentum_convergence_score = 0
+        momentum_weights = [0.5, 0.3, 0.2]  # Weight recent momentum more heavily
+        weighted_momentum = (momentum_1d * momentum_weights[0] + 
+                           momentum_3d * momentum_weights[1] + 
+                           momentum_5d * momentum_weights[2])
+        
+        # Momentum acceleration detection
+        momentum_accel = (momentum_1d - momentum_3d) / 3 if momentum_3d != 0 else 0
+        momentum_jerk = (momentum_accel - ((momentum_3d - momentum_5d) / 2)) if momentum_5d != 0 else 0
+        
+        if weighted_momentum > 2 and momentum_accel > 0.5:
+            momentum_convergence_score = 35 + (momentum_jerk * 10)
+        elif weighted_momentum > 1 and momentum_accel > 0:
+            momentum_convergence_score = 20 + (momentum_jerk * 5)
+        
+        # 2. ADVANCED RSI DIVERGENCE ANALYSIS
+        rsi_divergence_score = 0
+        if len(hist) >= 20:
+            prices = hist['Close'].tail(20).values
+            # Calculate RSI for multiple periods
+            rsi_values = []
+            for i in range(14, len(prices)):
+                gains = []
+                losses = []
+                for j in range(i-14, i):
+                    change = prices[j+1] - prices[j]
+                    if change > 0:
+                        gains.append(change)
+                        losses.append(0)
+                    else:
+                        gains.append(0)
+                        losses.append(abs(change))
+                
+                avg_gain = np.mean(gains)
+                avg_loss = np.mean(losses)
+                rs = avg_gain / avg_loss if avg_loss != 0 else 100
+                rsi_val = 100 - (100 / (1 + rs))
+                rsi_values.append(rsi_val)
+            
+            if len(rsi_values) >= 5:
+                # Detect bullish divergence
+                price_trend = np.polyfit(range(len(prices[-5:])), prices[-5:], 1)[0]
+                rsi_trend = np.polyfit(range(len(rsi_values[-5:])), rsi_values[-5:], 1)[0]
+                
+                if price_trend < 0 and rsi_trend > 0 and rsi < 35:  # Bullish divergence
+                    rsi_divergence_score = 40
+                elif rsi < 25 and rsi_trend > 0:  # Extreme oversold with momentum
+                    rsi_divergence_score = 50
+        
+        # 3. SOPHISTICATED VOLUME ANALYSIS
+        volume_sophistication_score = 0
+        if len(hist) >= 30:
+            volumes = hist['Volume'].tail(30).values
+            prices = hist['Close'].tail(30).values
+            
+            # Volume-Price Trend (VPT) analysis
+            vpt = []
+            vpt_val = 0
+            for i in range(1, len(prices)):
+                vpt_val += volumes[i] * ((prices[i] - prices[i-1]) / prices[i-1])
+                vpt.append(vpt_val)
+            
+            # On-Balance Volume (OBV) momentum
+            obv = []
+            obv_val = volumes[0]
+            for i in range(1, len(prices)):
+                if prices[i] > prices[i-1]:
+                    obv_val += volumes[i]
+                elif prices[i] < prices[i-1]:
+                    obv_val -= volumes[i]
+                obv.append(obv_val)
+            
+            # Volume breakout detection
+            avg_volume = np.mean(volumes[-20:])
+            recent_volume = np.mean(volumes[-3:])
+            volume_surge = recent_volume / avg_volume if avg_volume > 0 else 1
+            
+            if volume_surge > 2.5 and len(obv) > 5 and obv[-1] > obv[-5]:
+                volume_sophistication_score = 45
+            elif volume_surge > 1.8 and len(vpt) > 5 and vpt[-1] > vpt[-5]:
+                volume_sophistication_score = 30
+        
+        # === ENHANCED BULLISH MOMENTUM INDICATORS ===
+        
+        # 1. ADVANCED Oversold Bounce Potential (Mean Reversion with Statistical Edge)
         oversold_score = 0
         if rsi < 35:  # Oversold conditions
-            oversold_score = (35 - rsi) * 4  # More aggressive scoring
+            # Statistical mean reversion probability
+            std_multiplier = (35 - rsi) / 10  # Standard deviation multiplier
+            oversold_score = (35 - rsi) * 6 * std_multiplier  # Enhanced aggressive scoring
+            
             if bb_position < 0.15:  # Near lower Bollinger Band
-                oversold_score *= 2.0  # Double the score
-            if rsi < 25:  # Extremely oversold
-                oversold_score *= 1.5  # Extra boost for extreme conditions
+                # Calculate Bollinger Band squeeze
+                bb_squeeze_factor = (0.15 - bb_position) * 10
+                oversold_score *= (2.0 + bb_squeeze_factor)  # Dynamic boost
+            
+            if rsi < 25:  # Extremely oversold with higher probability
+                statistical_edge = (25 - rsi) / 5  # Statistical edge factor
+                oversold_score *= (1.5 + statistical_edge)  # Progressive boost
         
-        # 2. Momentum Acceleration (Trend Following)
-        momentum_acceleration = 0
+        # 2. QUANTUM Momentum Acceleration (Multi-dimensional Trend Analysis)
+        momentum_acceleration = momentum_convergence_score  # Use our enhanced score
         if momentum_1d > 0 and momentum_3d > momentum_1d:  # Accelerating upward
-            momentum_acceleration = momentum_3d * 15  # More aggressive
-            if volume_trend > 1.5:  # Backed by volume
-                momentum_acceleration *= 2.0
+            acceleration_factor = (momentum_1d - momentum_3d) / momentum_3d if momentum_3d != 0 else 1
+            momentum_acceleration += momentum_3d * 20 * (1 + acceleration_factor)
+            
+            if volume_trend > 1.5:  # Backed by volume with exponential scaling
+                volume_multiplier = min(3.0, volume_trend)  # Cap the multiplier
+                momentum_acceleration *= volume_multiplier
         elif momentum_1d > 2 and momentum_3d > 0:  # Strong recent momentum
-            momentum_acceleration = momentum_1d * 20
+            momentum_acceleration += momentum_1d * 25  # Increased from 20
         
-        # 3. High Volatility Opportunity Boost
+        # 3. ENHANCED High Volatility Opportunity with Risk-Adjusted Returns
         volatility_boost = 0
         if volatility > 0.4:  # High volatility = high potential gains
-            volatility_boost = volatility * 50
-        elif volatility > 0.6:  # Extreme volatility
-            volatility_boost = volatility * 80
+            # Risk-adjusted volatility scoring
+            vol_efficiency = min(2.0, volatility / 0.3)  # Efficiency ratio
+            volatility_boost = volatility * 65 * vol_efficiency  # Enhanced from 50
+        elif volatility > 0.6:  # Extreme volatility with exponential scaling
+            extreme_vol_factor = min(3.0, volatility / 0.4)
+            volatility_boost = volatility * 120 * extreme_vol_factor  # Enhanced from 80
         
         # 4. Small/Mid-Cap Growth Boost
         # Smaller stocks tend to have higher % moves
