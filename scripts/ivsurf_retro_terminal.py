@@ -2169,8 +2169,7 @@ class RetroTerminal:
             ],
             name='Implied Volatility Surface',
             colorbar=dict(
-                title="Implied Volatility",
-                titlefont=dict(color='#00ff00'),
+                title=dict(text="Implied Volatility", font=dict(color='#00ff00')),
                 tickfont=dict(color='#00ff00')
             ),
             hovertemplate='<b>Time to Expiry</b>: %{x:.3f} years<br>' +
@@ -2220,22 +2219,19 @@ class RetroTerminal:
             },
             scene=dict(
                 xaxis=dict(
-                    title='Time to Expiry (Years)',
-                    titlefont=dict(color='#00ff00'),
+                    title=dict(text='Time to Expiry (Years)', font=dict(color='#00ff00')),
                     tickfont=dict(color='#00ff00'),
                     gridcolor='#004400',
                     backgroundcolor='#000000'
                 ),
                 yaxis=dict(
-                    title='Strike Price ($)',
-                    titlefont=dict(color='#00ff00'),
+                    title=dict(text='Strike Price ($)', font=dict(color='#00ff00')),
                     tickfont=dict(color='#00ff00'),
                     gridcolor='#004400',
                     backgroundcolor='#000000'
                 ),
                 zaxis=dict(
-                    title='Implied Volatility',
-                    titlefont=dict(color='#00ff00'),
+                    title=dict(text='Implied Volatility', font=dict(color='#00ff00')),
                     tickfont=dict(color='#00ff00'),
                     gridcolor='#004400',
                     backgroundcolor='#000000'
@@ -2620,14 +2616,12 @@ class RetroTerminal:
                         'x': 0.5
                     },
                     xaxis=dict(
-                        title='Date',
-                        titlefont=dict(color='#00ff00'),
+                        title=dict(text='Date', font=dict(color='#00ff00')),
                         tickfont=dict(color='#00ff00'),
                         gridcolor='#004400'
                     ),
                     yaxis=dict(
-                        title='Price ($)',
-                        titlefont=dict(color='#00ff00'),
+                        title=dict(text='Price ($)', font=dict(color='#00ff00')),
                         tickfont=dict(color='#00ff00'),
                         gridcolor='#004400'
                     ),
