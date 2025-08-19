@@ -18,6 +18,20 @@ import plotly.express as px
 import yfinance as yf
 import threading
 import time
+
+# Import risk management modules
+try:
+    import sys
+    import os
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from risk.var_analysis import VaRAnalyzer
+    from risk.stress_testing import StressTester
+    RISK_MODULES_AVAILABLE = True
+except ImportError:
+    # Fallback if modules not available
+    VaRAnalyzer = None
+    StressTester = None
+    RISK_MODULES_AVAILABLE = False
 import sys
 import os
 from datetime import datetime, timedelta
@@ -1798,6 +1812,307 @@ class RetroTerminal:
             
         return st.session_state.market_scan_data
     
+    def calculate_portfolio_var(self, tickers, portfolio_value=1000000):
+        """
+        Calculate comprehensive Value at Risk for portfolio
+        
+        Args:
+            tickers: List of tickers in portfolio
+            portfolio_value: Total portfolio value
+            
+        Returns:
+            dict: VaR analysis results
+        """
+        if not RISK_MODULES_AVAILABLE:
+            return {'error': 'Risk modules not available'}
+            
+        try:
+            # Download historical data for portfolio
+            portfolio_data = {}
+            for ticker in tickers[:10]:  # Limit to 10 stocks for performance
+                try:
+                    data = yf.download(ticker, period='1y', progress=False)
+                    if not data.empty:
+                        portfolio_data[ticker] = data['Close'].pct_change().dropna()
+                except:
+                    continue
+            
+            if not portfolio_data:
+                return {'error': 'No valid portfolio data'}
+            
+            # Create equal-weighted portfolio
+            portfolio_df = pd.DataFrame(portfolio_data)
+            portfolio_df = portfolio_df.dropna()
+            
+            # Calculate equal-weighted portfolio returns
+            weights = np.ones(len(portfolio_df.columns)) / len(portfolio_df.columns)
+            portfolio_returns = (portfolio_df * weights).sum(axis=1)
+            
+            # Initialize VaR analyzer
+            var_analyzer = VaRAnalyzer(confidence_levels=[0.95, 0.99])
+            var_analyzer.load_data(portfolio_returns, portfolio_value)
+            
+            # Calculate comprehensive VaR
+            var_results = var_analyzer.comprehensive_var_analysis()
+            
+            # Calculate risk metrics
+            risk_metrics = var_analyzer.risk_metrics_summary()
+            
+            # Initialize stress tester
+            stress_tester = StressTester()
+            stress_tester.load_portfolio_data(portfolio_returns)
+            
+            # Run basic stress tests
+            stress_results = {}
+            stress_tester.define_stress_scenarios()
+            
+            # Run a few key stress scenarios
+            key_scenarios = ['market_crash', 'black_monday', 'covid_crash']
+            for scenario in key_scenarios:
+                try:
+                    stress_results[scenario] = stress_tester.monte_carlo_stress_test(
+                        scenario, simulations=1000, portfolio_value=portfolio_value
+                    )
+                except:
+                    continue
+            
+            return {
+                'portfolio_tickers': list(portfolio_df.columns),
+                'portfolio_value': portfolio_value,
+                'var_analysis': var_results,
+                'risk_metrics': risk_metrics,
+                'stress_test_results': stress_results,
+                'portfolio_returns': portfolio_returns.tail(252).tolist(),  # Last year of returns
+                'success': True
+            }
+            
+        except Exception as e:
+            return {'error': f'VaR calculation failed: {str(e)}'}
+    
+    def display_risk_management_dashboard(self):
+        """
+        Display comprehensive risk management dashboard
+        """
+        st.markdown("""
+        <div class="terminal-box">
+            <div class="terminal-prompt">
+                <span class="glow-red">█</span> RISK MANAGEMENT CONTROL CENTER <span class="glow-red">█</span>
+            </div>
+            <div style="color: #ff6666; font-size: 13px; margin-top: 8px;">
+                ADVANCED VaR ANALYSIS & STRESS TESTING SUITE
+            </div>
+            <div style="color: #ffaaaa; font-size: 11px; margin-top: 5px; font-style: italic;">
+                Historical | Parametric | Monte Carlo | Stress Scenarios
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        if not RISK_MODULES_AVAILABLE:
+            st.error("❌ Risk management modules not available. Please check installation.")
+            return
+        
+        # Portfolio setup
+        st.markdown("### 📊 Portfolio Configuration")
+        
+        col1, col2 = st.columns([3, 1])
+        
+        with col1:
+            portfolio_tickers = st.text_input(
+                "Portfolio Tickers (comma-separated):", 
+                value="AAPL,MSFT,GOOGL,TSLA,NVDA",
+                help="Enter stock tickers separated by commas"
+            )
+        
+        with col2:
+            portfolio_value = st.number_input(
+                "Portfolio Value ($):",
+                min_value=10000,
+                max_value=100000000,
+                value=1000000,
+                step=50000
+            )
+        
+        if st.button("🔍 CALCULATE VaR & STRESS TESTS", type="primary"):
+            tickers = [t.strip().upper() for t in portfolio_tickers.split(',') if t.strip()]
+            
+            if not tickers:
+                st.error("Please enter at least one ticker")
+                return
+            
+            with st.spinner('🧮 Calculating comprehensive risk metrics...'):
+                risk_results = self.calculate_portfolio_var(tickers, portfolio_value)
+            
+            if 'error' in risk_results:
+                st.error(f"❌ {risk_results['error']}")
+                return
+            
+            # Display results
+            self._display_var_results(risk_results)
+    
+    def _display_var_results(self, results):
+        """Display VaR analysis results"""
+        
+        # VaR Summary Cards
+        st.markdown("### 📈 Value at Risk Summary")
+        
+        var_95 = results['var_analysis']['VaR_95']
+        var_99 = results['var_analysis']['VaR_99']
+        
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            hist_var_95 = var_95['historical']['var_absolute']
+            st.metric(
+                "Historical VaR (95%)",
+                f"${hist_var_95:,.0f}",
+                delta=f"{var_95['historical']['var_relative']*100:.2f}%"
+            )
+        
+        with col2:
+            param_var_95 = var_95['parametric_normal']['var_absolute']
+            st.metric(
+                "Parametric VaR (95%)",
+                f"${param_var_95:,.0f}",
+                delta=f"{var_95['parametric_normal']['var_relative']*100:.2f}%"
+            )
+        
+        with col3:
+            mc_var_95 = var_95['monte_carlo']['var_absolute']
+            st.metric(
+                "Monte Carlo VaR (95%)",
+                f"${mc_var_95:,.0f}",
+                delta=f"{var_95['monte_carlo']['var_relative']*100:.2f}%"
+            )
+        
+        with col4:
+            hist_es_95 = var_95['historical']['expected_shortfall_absolute']
+            st.metric(
+                "Expected Shortfall (95%)",
+                f"${hist_es_95:,.0f}",
+                delta=f"{var_95['historical']['expected_shortfall_relative']*100:.2f}%"
+            )
+        
+        # Risk Metrics
+        st.markdown("### 📊 Portfolio Risk Metrics")
+        
+        risk_metrics = results['risk_metrics']
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.metric(
+                "Annual Volatility",
+                f"{risk_metrics['volatility_annual']*100:.1f}%"
+            )
+            st.metric(
+                "Sharpe Ratio",
+                f"{risk_metrics['sharpe_ratio']:.2f}"
+            )
+        
+        with col2:
+            st.metric(
+                "Maximum Drawdown",
+                f"{risk_metrics['max_drawdown']*100:.1f}%"
+            )
+            st.metric(
+                "Sortino Ratio",
+                f"{risk_metrics['sortino_ratio']:.2f}"
+            )
+        
+        with col3:
+            st.metric(
+                "Skewness",
+                f"{risk_metrics['skewness']:.2f}"
+            )
+            st.metric(
+                "Kurtosis",
+                f"{risk_metrics['kurtosis']:.2f}"
+            )
+        
+        # Stress Test Results
+        if results['stress_test_results']:
+            st.markdown("### ⚠️ Stress Test Scenarios")
+            
+            stress_tabs = st.tabs(list(results['stress_test_results'].keys()))
+            
+            for i, (scenario_name, scenario_data) in enumerate(results['stress_test_results'].items()):
+                with stress_tabs[i]:
+                    st.markdown(f"**{scenario_data['description']}**")
+                    
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.metric(
+                            "Expected Loss",
+                            f"${scenario_data['results']['mean_pnl']:,.0f}",
+                            delta=f"{scenario_data['results']['mean_return']*100:.2f}%"
+                        )
+                        st.metric(
+                            "5th Percentile Loss",
+                            f"${scenario_data['results']['percentile_5_pnl']:,.0f}",
+                            delta=f"{scenario_data['results']['percentile_5']*100:.2f}%"
+                        )
+                    
+                    with col2:
+                        st.metric(
+                            "Worst Case Loss",
+                            f"${scenario_data['results']['worst_case_pnl']:,.0f}",
+                            delta=f"{scenario_data['results']['worst_case_return']*100:.2f}%"
+                        )
+                        st.metric(
+                            "1st Percentile Loss",
+                            f"${scenario_data['results']['percentile_1_pnl']:,.0f}",
+                            delta=f"{scenario_data['results']['percentile_1']*100:.2f}%"
+                        )
+        
+        # VaR Comparison Chart
+        st.markdown("### 📈 VaR Method Comparison")
+        
+        var_comparison_data = {
+            'Method': ['Historical', 'Parametric (Normal)', 'Parametric (t-dist)', 'Monte Carlo'],
+            'VaR_95': [
+                var_95['historical']['var_absolute'],
+                var_95['parametric_normal']['var_absolute'],
+                var_95['parametric_t']['var_absolute'],
+                var_95['monte_carlo']['var_absolute']
+            ],
+            'VaR_99': [
+                var_99['historical']['var_absolute'],
+                var_99['parametric_normal']['var_absolute'],
+                var_99['parametric_t']['var_absolute'],
+                var_99['monte_carlo']['var_absolute']
+            ]
+        }
+        
+        var_df = pd.DataFrame(var_comparison_data)
+        
+        fig = go.Figure()
+        
+        fig.add_trace(go.Bar(
+            name='95% VaR',
+            x=var_df['Method'],
+            y=var_df['VaR_95'],
+            marker_color='orange'
+        ))
+        
+        fig.add_trace(go.Bar(
+            name='99% VaR',
+            x=var_df['Method'],
+            y=var_df['VaR_99'],
+            marker_color='red'
+        ))
+        
+        fig.update_layout(
+            title="Value at Risk Comparison Across Methods",
+            xaxis_title="VaR Method",
+            yaxis_title="VaR Amount ($)",
+            barmode='group',
+            template='plotly_dark',
+            height=400
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+    
     def _calculate_quantum_correlation(self, prices):
         """Quantum-inspired correlation analysis for ultra-advanced prediction"""
         try:
@@ -2010,11 +2325,12 @@ class RetroTerminal:
         """, unsafe_allow_html=True)
         
         # Create enhanced tabs with better naming and icons
-        tab1, tab2, tab3, tab4 = st.tabs([
+        tab1, tab2, tab3, tab4, tab5 = st.tabs([
             "YESTERDAY'S WINNERS", 
             "TOMORROW'S GAINS", 
             "OPTIONS - YESTERDAY", 
-            "OPTIONS - TOMORROW"
+            "OPTIONS - TOMORROW",
+            "RISK MANAGEMENT"
         ])
         
         with tab1:
@@ -2216,6 +2532,10 @@ class RetroTerminal:
             tomorrow_options_display.columns = ['TICKER', 'CURRENT', 'PREDICTED', 'MOD TARGET', 'AGG TARGET', 'CONFIDENCE', 'OPT SCORE']
             
             st.dataframe(tomorrow_options_display, use_container_width=True, hide_index=True)
+        
+        with tab5:
+            # Risk Management Dashboard
+            self.display_risk_management_dashboard()
         
         # Enhanced market intelligence summary
         st.markdown("""
