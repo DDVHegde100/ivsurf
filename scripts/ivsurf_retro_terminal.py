@@ -1729,12 +1729,14 @@ class RetroTerminal:
         self.set_page_config()
         self.render_header()
         
-        # Enhanced Navigation
-        tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        # Enhanced Navigation with new advanced features
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
             "MARKET SCANNER", 
             "INDIVIDUAL ANALYSIS", 
             "VOLATILITY SURFACE", 
             "ML FORECASTING",
+            "TECHNICAL ANALYSIS",
+            "MONTE CARLO SIM",
             "SYSTEM STATUS"
         ])
         
@@ -1751,6 +1753,12 @@ class RetroTerminal:
             self.display_ml_forecasting()
         
         with tab5:
+            self.display_technical_analysis()
+        
+        with tab6:
+            self.display_monte_carlo_simulation()
+        
+        with tab7:
             self.display_system_status()
 
     def display_volatility_surface(self):
@@ -3964,6 +3972,809 @@ class RetroTerminal:
             except Exception as e:
                 st.error(f"ML forecasting failed: {str(e)}")
                 st.error("Please check your parameters and data availability.")
+
+    def display_technical_analysis(self):
+        """Display advanced technical analysis suite"""
+        
+        st.markdown("""
+        <div class="terminal-box">
+            <div class="terminal-prompt">
+                <span class="glow-green">█</span> ADVANCED TECHNICAL ANALYSIS SUITE <span class="glow-green">█</span>
+            </div>
+            <div style="color: #66ff66; font-size: 13px; margin-top: 8px;">
+                Professional technical indicators with volume profile and multi-timeframe analysis
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Control panel
+        st.markdown("""
+        <div class="nav-container">
+            <div class="nav-title">TECHNICAL ANALYSIS CONTROL PANEL</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        col1, col2, col3 = st.columns([2, 1, 1])
+        
+        with col1:
+            symbol = st.text_input(
+                "TICKER SYMBOL",
+                value="AAPL",
+                help="Enter stock symbol for technical analysis"
+            ).upper()
+        
+        with col2:
+            lookback_days = st.selectbox(
+                "ANALYSIS PERIOD",
+                [30, 60, 90, 180, 365],
+                index=3,
+                help="Historical data period"
+            )
+        
+        with col3:
+            analysis_type = st.selectbox(
+                "ANALYSIS TYPE",
+                ["Volume Profile", "Volatility Cone", "Multi-Timeframe", "Support/Resistance"],
+                help="Select analysis method"
+            )
+        
+        if st.button("🔍 RUN TECHNICAL ANALYSIS", key="tech_analysis"):
+            
+            st.markdown("""
+            <div class="terminal-box">
+                <div class="terminal-prompt">EXECUTING TECHNICAL ANALYSIS...</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            try:
+                # Fetch data
+                with st.spinner("Fetching market data..."):
+                    end_date = datetime.now()
+                    start_date = end_date - timedelta(days=lookback_days)
+                    
+                    ticker = yf.Ticker(symbol)
+                    data = ticker.history(start=start_date, end=end_date)
+                    
+                    if data.empty:
+                        st.error(f"No data found for symbol {symbol}")
+                        return
+                
+                # Import technical analysis modules
+                try:
+                    from indicators.advanced import (
+                        VolumeProfileAnalyzer, VolatilityConeAnalyzer, 
+                        MultiTimeframeAnalyzer, calculate_support_resistance_with_volume
+                    )
+                    
+                    if analysis_type == "Volume Profile":
+                        st.markdown("""
+                        <div class="terminal-box">
+                            <div class="terminal-prompt">
+                                <span class="glow-green">█</span> VOLUME PROFILE ANALYSIS <span class="glow-green">█</span>
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        # Volume Profile Analysis
+                        vp_analyzer = VolumeProfileAnalyzer(num_bins=50)
+                        vp_result = vp_analyzer.calculate_volume_profile(data)
+                        
+                        # Display results
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            st.markdown("""
+                            <div class="trading-metric">
+                                <div class="metric-label">VPOC (Volume Point of Control)</div>
+                                <div class="metric-value">${:.2f}</div>
+                                <div class="metric-detail">Highest volume price level</div>
+                            </div>
+                            """.format(vp_result.vpoc), unsafe_allow_html=True)
+                            
+                            st.markdown("""
+                            <div class="trading-metric">
+                                <div class="metric-label">VALUE AREA</div>
+                                <div class="metric-value">${:.2f} - ${:.2f}</div>
+                                <div class="metric-detail">{:.1%} of total volume</div>
+                            </div>
+                            """.format(vp_result.value_area_low, vp_result.value_area_high, 
+                                     vp_result.value_area_volume_pct), unsafe_allow_html=True)
+                        
+                        with col2:
+                            st.markdown("""
+                            <div class="trading-metric">
+                                <div class="metric-label">POC STRENGTH</div>
+                                <div class="metric-value">{:.2f}</div>
+                                <div class="metric-detail">Relative dominance factor</div>
+                            </div>
+                            """.format(vp_result.poc_strength), unsafe_allow_html=True)
+                            
+                            current_price = data['Close'].iloc[-1]
+                            if current_price > vp_result.vpoc:
+                                bias = "BULLISH"
+                                bias_color = "#00ff41"
+                            else:
+                                bias = "BEARISH"
+                                bias_color = "#ff4141"
+                            
+                            st.markdown(f"""
+                            <div class="trading-metric">
+                                <div class="metric-label">MARKET BIAS</div>
+                                <div class="metric-value" style="color: {bias_color};">{bias}</div>
+                                <div class="metric-detail">Price vs VPOC position</div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        
+                        # Volume Profile Chart
+                        fig = go.Figure()
+                        
+                        # Price chart
+                        fig.add_trace(go.Scatter(
+                            x=data.index,
+                            y=data['Close'],
+                            mode='lines',
+                            name='Price',
+                            line=dict(color='#00ff41', width=2)
+                        ))
+                        
+                        # VPOC line
+                        fig.add_hline(
+                            y=vp_result.vpoc,
+                            line=dict(color='#ffff41', width=3, dash='dash'),
+                            annotation_text=f"VPOC: ${vp_result.vpoc:.2f}"
+                        )
+                        
+                        # Value Area
+                        fig.add_hrect(
+                            y0=vp_result.value_area_low,
+                            y1=vp_result.value_area_high,
+                            fillcolor="rgba(255, 255, 65, 0.2)",
+                            line_width=0,
+                            annotation_text="Value Area"
+                        )
+                        
+                        fig.update_layout(
+                            title=f"{symbol} - Volume Profile Analysis",
+                            xaxis_title="Date",
+                            yaxis_title="Price ($)",
+                            plot_bgcolor='black',
+                            paper_bgcolor='black',
+                            font=dict(color='#88ff88', family='Courier New'),
+                            height=400
+                        )
+                        
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                        # Support/Resistance Levels
+                        if vp_result.support_levels or vp_result.resistance_levels:
+                            st.markdown("""
+                            <div class="terminal-box">
+                                <div class="terminal-prompt">KEY LEVELS ANALYSIS</div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            
+                            col1, col2 = st.columns(2)
+                            
+                            with col1:
+                                st.markdown("**SUPPORT LEVELS:**")
+                                for i, level in enumerate(vp_result.support_levels[:5]):
+                                    distance = abs(current_price - level) / current_price
+                                    st.markdown(f"• ${level:.2f} ({distance:.1%} away)")
+                            
+                            with col2:
+                                st.markdown("**RESISTANCE LEVELS:**")
+                                for i, level in enumerate(vp_result.resistance_levels[:5]):
+                                    distance = abs(level - current_price) / current_price
+                                    st.markdown(f"• ${level:.2f} ({distance:.1%} away)")
+                    
+                    elif analysis_type == "Volatility Cone":
+                        st.markdown("""
+                        <div class="terminal-box">
+                            <div class="terminal-prompt">
+                                <span class="glow-green">█</span> VOLATILITY CONE ANALYSIS <span class="glow-green">█</span>
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        # Volatility Cone Analysis
+                        vc_analyzer = VolatilityConeAnalyzer()
+                        vc_result = vc_analyzer.calculate_volatility_cone(data)
+                        
+                        # Display volatility metrics
+                        col1, col2, col3 = st.columns(3)
+                        
+                        with col1:
+                            current_vol = vc_result.current_volatility[0] if len(vc_result.current_volatility) > 0 else 0
+                            st.markdown("""
+                            <div class="trading-metric">
+                                <div class="metric-label">CURRENT VOLATILITY</div>
+                                <div class="metric-value">{:.1%}</div>
+                                <div class="metric-detail">5-day realized vol</div>
+                            </div>
+                            """.format(current_vol), unsafe_allow_html=True)
+                        
+                        with col2:
+                            vol_rank = vc_result.volatility_rank[0] if len(vc_result.volatility_rank) > 0 else 50
+                            st.markdown("""
+                            <div class="trading-metric">
+                                <div class="metric-label">VOLATILITY RANK</div>
+                                <div class="metric-value">{:.0f}th</div>
+                                <div class="metric-detail">Historical percentile</div>
+                            </div>
+                            """.format(vol_rank), unsafe_allow_html=True)
+                        
+                        with col3:
+                            signal = vc_result.mean_reversion_signals[0] if len(vc_result.mean_reversion_signals) > 0 else 0
+                            signal_text = "EXPANSION" if signal > 0 else "CONTRACTION" if signal < 0 else "NEUTRAL"
+                            signal_color = "#00ff41" if signal > 0 else "#ff4141" if signal < 0 else "#ffff41"
+                            
+                            st.markdown(f"""
+                            <div class="trading-metric">
+                                <div class="metric-label">MEAN REVERSION SIGNAL</div>
+                                <div class="metric-value" style="color: {signal_color};">{signal_text}</div>
+                                <div class="metric-detail">Expected vol direction</div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        
+                        # Volatility Cone Chart
+                        if len(vc_result.timeframes) > 0:
+                            fig = go.Figure()
+                            
+                            timeframes = vc_result.timeframes
+                            
+                            # Add percentile bands
+                            fig.add_trace(go.Scatter(
+                                x=timeframes,
+                                y=vc_result.percentiles['95'],
+                                mode='lines',
+                                name='95th Percentile',
+                                line=dict(color='#ff4141', width=1)
+                            ))
+                            
+                            fig.add_trace(go.Scatter(
+                                x=timeframes,
+                                y=vc_result.percentiles['75'],
+                                mode='lines',
+                                name='75th Percentile',
+                                line=dict(color='#ffaa41', width=1)
+                            ))
+                            
+                            fig.add_trace(go.Scatter(
+                                x=timeframes,
+                                y=vc_result.percentiles['50'],
+                                mode='lines',
+                                name='50th Percentile (Median)',
+                                line=dict(color='#ffff41', width=2)
+                            ))
+                            
+                            fig.add_trace(go.Scatter(
+                                x=timeframes,
+                                y=vc_result.percentiles['25'],
+                                mode='lines',
+                                name='25th Percentile',
+                                line=dict(color='#aaff41', width=1)
+                            ))
+                            
+                            fig.add_trace(go.Scatter(
+                                x=timeframes,
+                                y=vc_result.percentiles['5'],
+                                mode='lines',
+                                name='5th Percentile',
+                                line=dict(color='#41ff41', width=1)
+                            ))
+                            
+                            # Current volatility
+                            fig.add_trace(go.Scatter(
+                                x=timeframes,
+                                y=vc_result.current_volatility,
+                                mode='markers+lines',
+                                name='Current Volatility',
+                                line=dict(color='#00ff41', width=3),
+                                marker=dict(size=8, color='#00ff41')
+                            ))
+                            
+                            fig.update_layout(
+                                title=f"{symbol} - Volatility Cone Analysis",
+                                xaxis_title="Timeframe (Days)",
+                                yaxis_title="Annualized Volatility",
+                                plot_bgcolor='black',
+                                paper_bgcolor='black',
+                                font=dict(color='#88ff88', family='Courier New'),
+                                height=400,
+                                yaxis=dict(tickformat='.1%')
+                            )
+                            
+                            st.plotly_chart(fig, use_container_width=True)
+                    
+                    elif analysis_type == "Support/Resistance":
+                        st.markdown("""
+                        <div class="terminal-box">
+                            <div class="terminal-prompt">
+                                <span class="glow-green">█</span> SUPPORT/RESISTANCE WITH VOLUME <span class="glow-green">█</span>
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        # Support/Resistance Analysis
+                        support_levels, resistance_levels = calculate_support_resistance_with_volume(
+                            data, lookback_period=min(50, len(data))
+                        )
+                        
+                        # Display levels
+                        col1, col2 = st.columns(2)
+                        current_price = data['Close'].iloc[-1]
+                        
+                        with col1:
+                            st.markdown("**SUPPORT LEVELS (Volume Confirmed):**")
+                            if support_levels:
+                                for level in support_levels[:5]:
+                                    distance = (current_price - level) / current_price
+                                    strength = "STRONG" if distance < 0.02 else "MODERATE" if distance < 0.05 else "WEAK"
+                                    st.markdown(f"• ${level:.2f} - {strength} ({distance:.1%})")
+                            else:
+                                st.markdown("• No significant support levels detected")
+                        
+                        with col2:
+                            st.markdown("**RESISTANCE LEVELS (Volume Confirmed):**")
+                            if resistance_levels:
+                                for level in resistance_levels[:5]:
+                                    distance = (level - current_price) / current_price
+                                    strength = "STRONG" if distance < 0.02 else "MODERATE" if distance < 0.05 else "WEAK"
+                                    st.markdown(f"• ${level:.2f} - {strength} ({distance:.1%})")
+                            else:
+                                st.markdown("• No significant resistance levels detected")
+                        
+                        # Chart with levels
+                        fig = go.Figure()
+                        
+                        # Candlestick chart
+                        fig.add_trace(go.Candlestick(
+                            x=data.index,
+                            open=data['Open'],
+                            high=data['High'],
+                            low=data['Low'],
+                            close=data['Close'],
+                            name='Price'
+                        ))
+                        
+                        # Support levels
+                        for level in support_levels[:3]:
+                            fig.add_hline(
+                                y=level,
+                                line=dict(color='#00ff41', width=2, dash='dash'),
+                                annotation_text=f"Support: ${level:.2f}"
+                            )
+                        
+                        # Resistance levels
+                        for level in resistance_levels[:3]:
+                            fig.add_hline(
+                                y=level,
+                                line=dict(color='#ff4141', width=2, dash='dash'),
+                                annotation_text=f"Resistance: ${level:.2f}"
+                            )
+                        
+                        fig.update_layout(
+                            title=f"{symbol} - Support/Resistance Analysis",
+                            xaxis_title="Date",
+                            yaxis_title="Price ($)",
+                            plot_bgcolor='black',
+                            paper_bgcolor='black',
+                            font=dict(color='#88ff88', family='Courier New'),
+                            height=500,
+                            xaxis_rangeslider_visible=False
+                        )
+                        
+                        st.plotly_chart(fig, use_container_width=True)
+                    
+                    else:  # Multi-Timeframe
+                        st.markdown("""
+                        <div class="terminal-box">
+                            <div class="terminal-prompt">
+                                <span class="glow-green">█</span> MULTI-TIMEFRAME ANALYSIS <span class="glow-green">█</span>
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        st.info("Multi-timeframe analysis requires multiple timeframe data sources. This feature is available in the full professional version.")
+                
+                except ImportError:
+                    st.error("Advanced technical analysis modules not available. Please ensure all required packages are installed.")
+                    st.code("pip install scikit-learn scipy")
+                
+            except Exception as e:
+                st.error(f"Technical analysis failed: {str(e)}")
+                st.error("Please check your symbol and try again.")
+
+    def display_monte_carlo_simulation(self):
+        """Display Monte Carlo options simulation"""
+        
+        st.markdown("""
+        <div class="terminal-box">
+            <div class="terminal-prompt">
+                <span class="glow-green">█</span> MONTE CARLO OPTIONS SIMULATOR <span class="glow-green">█</span>
+            </div>
+            <div style="color: #66ff66; font-size: 13px; margin-top: 8px;">
+                Advanced Monte Carlo simulation with exotic options and variance reduction
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Control panel
+        st.markdown("""
+        <div class="nav-container">
+            <div class="nav-title">MONTE CARLO SIMULATION CONTROL PANEL</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Option parameters
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            spot_price = st.number_input(
+                "SPOT PRICE ($)",
+                min_value=1.0,
+                value=100.0,
+                step=1.0,
+                help="Current underlying price"
+            )
+            
+            strike_price = st.number_input(
+                "STRIKE PRICE ($)",
+                min_value=1.0,
+                value=105.0,
+                step=1.0,
+                help="Option strike price"
+            )
+        
+        with col2:
+            time_to_expiry = st.number_input(
+                "TIME TO EXPIRY (Years)",
+                min_value=0.01,
+                max_value=5.0,
+                value=0.25,
+                step=0.01,
+                help="Time until option expiration"
+            )
+            
+            volatility = st.number_input(
+                "VOLATILITY (%)",
+                min_value=1.0,
+                max_value=200.0,
+                value=20.0,
+                step=1.0,
+                help="Annualized volatility"
+            ) / 100.0
+        
+        with col3:
+            risk_free_rate = st.number_input(
+                "RISK-FREE RATE (%)",
+                min_value=0.0,
+                max_value=20.0,
+                value=5.0,
+                step=0.1,
+                help="Risk-free interest rate"
+            ) / 100.0
+            
+            dividend_yield = st.number_input(
+                "DIVIDEND YIELD (%)",
+                min_value=0.0,
+                max_value=20.0,
+                value=2.0,
+                step=0.1,
+                help="Dividend yield"
+            ) / 100.0
+        
+        with col4:
+            option_type = st.selectbox(
+                "OPTION TYPE",
+                ["Call", "Put"],
+                help="Option type"
+            )
+            
+            option_style = st.selectbox(
+                "OPTION STYLE",
+                ["European", "American", "Barrier", "Asian", "Digital"],
+                help="Option exercise style"
+            )
+        
+        # Simulation parameters
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            n_simulations = st.selectbox(
+                "SIMULATIONS",
+                [10000, 50000, 100000, 250000, 500000],
+                index=2,
+                help="Number of Monte Carlo paths"
+            )
+        
+        with col2:
+            n_time_steps = st.selectbox(
+                "TIME STEPS",
+                [50, 100, 252, 500],
+                index=2,
+                help="Time steps per simulation"
+            )
+        
+        with col3:
+            variance_reduction = st.checkbox(
+                "VARIANCE REDUCTION",
+                value=True,
+                help="Use antithetic variates"
+            )
+        
+        # Exotic option parameters
+        if option_style == "Barrier":
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                barrier_level = st.number_input(
+                    "BARRIER LEVEL ($)",
+                    min_value=1.0,
+                    value=110.0,
+                    step=1.0
+                )
+            
+            with col2:
+                barrier_type = st.selectbox(
+                    "BARRIER TYPE",
+                    ["Up-and-Out", "Up-and-In", "Down-and-Out", "Down-and-In"]
+                )
+        
+        elif option_style == "Asian":
+            asian_type = st.selectbox(
+                "ASIAN TYPE",
+                ["Arithmetic", "Geometric"]
+            )
+        
+        if st.button("🎲 RUN MONTE CARLO SIMULATION", key="monte_carlo"):
+            
+            st.markdown("""
+            <div class="terminal-box">
+                <div class="terminal-prompt">EXECUTING MONTE CARLO SIMULATION...</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            try:
+                # Import simulation modules
+                try:
+                    from simulation.monte_carlo import (
+                        MonteCarloEngine, SimulationParameters, OptionParameters, OptionType
+                    )
+                    from simulation.exotic_options import (
+                        BarrierOption, AsianOption, DigitalOption, AmericanOption,
+                        BarrierOptionParameters, AsianOptionParameters, BarrierType, AsianType
+                    )
+                    
+                    # Setup simulation parameters
+                    sim_params = SimulationParameters(
+                        n_simulations=n_simulations,
+                        n_time_steps=n_time_steps,
+                        random_seed=42,
+                        use_antithetic=variance_reduction,
+                        use_control_variate=False,
+                        parallel_execution=False
+                    )
+                    
+                    # Setup option parameters
+                    opt_params = OptionParameters(
+                        spot_price=spot_price,
+                        strike_price=strike_price,
+                        time_to_expiry=time_to_expiry,
+                        risk_free_rate=risk_free_rate,
+                        volatility=volatility,
+                        dividend_yield=dividend_yield,
+                        option_type=OptionType.CALL if option_type == "Call" else OptionType.PUT
+                    )
+                    
+                    # Run simulation based on option style
+                    with st.spinner(f"Running {n_simulations:,} Monte Carlo simulations..."):
+                        start_time = time.time()
+                        
+                        if option_style == "European":
+                            mc_engine = MonteCarloEngine(sim_params)
+                            result = mc_engine.price_european_option(opt_params)
+                        
+                        elif option_style == "American":
+                            mc_engine = MonteCarloEngine(sim_params)
+                            result = mc_engine.price_american_option(opt_params)
+                        
+                        elif option_style == "Barrier":
+                            barrier_params = BarrierOptionParameters(
+                                **vars(opt_params),
+                                barrier_level=barrier_level,
+                                barrier_type=getattr(BarrierType, barrier_type.upper().replace("-", "_")),
+                                rebate=0.0
+                            )
+                            
+                            barrier_engine = BarrierOption()
+                            result = barrier_engine.price(barrier_params, n_simulations, n_time_steps)
+                        
+                        elif option_style == "Asian":
+                            asian_params = AsianOptionParameters(
+                                **vars(opt_params),
+                                asian_type=AsianType.ARITHMETIC if asian_type == "Arithmetic" else AsianType.GEOMETRIC,
+                                averaging_start=0.0
+                            )
+                            
+                            asian_engine = AsianOption()
+                            result = asian_engine.price(asian_params, n_simulations, n_time_steps)
+                        
+                        elif option_style == "Digital":
+                            digital_engine = DigitalOption()
+                            result = digital_engine.price(opt_params, payout_amount=10.0, 
+                                                        n_simulations=n_simulations, n_time_steps=n_time_steps)
+                        
+                        computation_time = time.time() - start_time
+                    
+                    # Display results
+                    st.markdown("""
+                    <div class="terminal-box">
+                        <div class="terminal-prompt">
+                            <span class="glow-green">█</span> SIMULATION RESULTS <span class="glow-green">█</span>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Main results
+                    col1, col2, col3, col4 = st.columns(4)
+                    
+                    with col1:
+                        st.markdown("""
+                        <div class="trading-metric">
+                            <div class="metric-label">OPTION PRICE</div>
+                            <div class="metric-value">${:.4f}</div>
+                            <div class="metric-detail">Monte Carlo estimate</div>
+                        </div>
+                        """.format(result.option_price), unsafe_allow_html=True)
+                    
+                    with col2:
+                        st.markdown("""
+                        <div class="trading-metric">
+                            <div class="metric-label">STANDARD ERROR</div>
+                            <div class="metric-value">${:.4f}</div>
+                            <div class="metric-detail">Estimation accuracy</div>
+                        </div>
+                        """.format(result.standard_error), unsafe_allow_html=True)
+                    
+                    with col3:
+                        ci_width = result.confidence_interval[1] - result.confidence_interval[0]
+                        st.markdown("""
+                        <div class="trading-metric">
+                            <div class="metric-label">95% CONFIDENCE INTERVAL</div>
+                            <div class="metric-value">±${:.4f}</div>
+                            <div class="metric-detail">Price uncertainty</div>
+                        </div>
+                        """.format(ci_width / 2), unsafe_allow_html=True)
+                    
+                    with col4:
+                        st.markdown("""
+                        <div class="trading-metric">
+                            <div class="metric-label">COMPUTATION TIME</div>
+                            <div class="metric-value">{:.2f}s</div>
+                            <div class="metric-detail">Execution speed</div>
+                        </div>
+                        """.format(computation_time), unsafe_allow_html=True)
+                    
+                    # Greeks (if available)
+                    if result.greeks and any(result.greeks.values()):
+                        st.markdown("""
+                        <div class="terminal-box">
+                            <div class="terminal-prompt">GREEKS ANALYSIS</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        greek_cols = st.columns(len(result.greeks))
+                        
+                        for i, (greek, value) in enumerate(result.greeks.items()):
+                            with greek_cols[i]:
+                                st.markdown("""
+                                <div class="trading-metric">
+                                    <div class="metric-label">{}</div>
+                                    <div class="metric-value">{:.4f}</div>
+                                    <div class="metric-detail">Risk sensitivity</div>
+                                </div>
+                                """.format(greek.upper(), value), unsafe_allow_html=True)
+                    
+                    # Payoff distribution
+                    if result.payoffs is not None and len(result.payoffs) > 0:
+                        st.markdown("""
+                        <div class="terminal-box">
+                            <div class="terminal-prompt">PAYOFF DISTRIBUTION ANALYSIS</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        fig = go.Figure()
+                        
+                        # Histogram of payoffs
+                        fig.add_trace(go.Histogram(
+                            x=result.payoffs,
+                            nbinsx=50,
+                            name='Payoff Distribution',
+                            marker=dict(color='#00ff41', opacity=0.7)
+                        ))
+                        
+                        # Add mean line
+                        fig.add_vline(
+                            x=np.mean(result.payoffs),
+                            line=dict(color='#ffff41', width=3, dash='dash'),
+                            annotation_text=f"Mean: ${np.mean(result.payoffs):.4f}"
+                        )
+                        
+                        fig.update_layout(
+                            title=f"Monte Carlo Payoff Distribution ({n_simulations:,} simulations)",
+                            xaxis_title="Discounted Payoff ($)",
+                            yaxis_title="Frequency",
+                            plot_bgcolor='black',
+                            paper_bgcolor='black',
+                            font=dict(color='#88ff88', family='Courier New'),
+                            height=400
+                        )
+                        
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                        # Risk metrics
+                        col1, col2, col3 = st.columns(3)
+                        
+                        with col1:
+                            var_95 = np.percentile(result.payoffs, 5)
+                            st.markdown("""
+                            <div class="trading-metric">
+                                <div class="metric-label">VALUE AT RISK (95%)</div>
+                                <div class="metric-value">${:.4f}</div>
+                                <div class="metric-detail">Worst case scenario</div>
+                            </div>
+                            """.format(var_95), unsafe_allow_html=True)
+                        
+                        with col2:
+                            prob_profit = np.mean(result.payoffs > 0)
+                            st.markdown("""
+                            <div class="trading-metric">
+                                <div class="metric-label">PROBABILITY OF PROFIT</div>
+                                <div class="metric-value">{:.1%}</div>
+                                <div class="metric-detail">Positive payoff chance</div>
+                            </div>
+                            """.format(prob_profit), unsafe_allow_html=True)
+                        
+                        with col3:
+                            if variance_reduction:
+                                vr_effectiveness = getattr(result, 'variance_reduction_effectiveness', 0)
+                                st.markdown("""
+                                <div class="trading-metric">
+                                    <div class="metric-label">VARIANCE REDUCTION</div>
+                                    <div class="metric-value">{:.1%}</div>
+                                    <div class="metric-detail">Efficiency gain</div>
+                                </div>
+                                """.format(vr_effectiveness), unsafe_allow_html=True)
+                    
+                    # Simulation performance
+                    st.markdown("""
+                    <div class="terminal-box">
+                        <div class="terminal-prompt">SIMULATION PERFORMANCE METRICS</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        sims_per_second = n_simulations / computation_time
+                        st.markdown(f"**Simulation Speed:** {sims_per_second:,.0f} paths/second")
+                        st.markdown(f"**Memory Usage:** {n_simulations * n_time_steps * 8 / 1024**2:.1f} MB")
+                        st.markdown(f"**Convergence:** {result.standard_error / result.option_price:.2%} relative error")
+                    
+                    with col2:
+                        st.markdown(f"**Random Seed:** 42 (reproducible)")
+                        st.markdown(f"**Model Type:** Geometric Brownian Motion")
+                        st.markdown(f"**Discretization:** Euler scheme")
+                
+                except ImportError as e:
+                    st.error("Monte Carlo simulation modules not available.")
+                    st.error(f"Import error: {str(e)}")
+                    st.code("Please ensure all simulation modules are properly installed.")
+            
+            except Exception as e:
+                st.error(f"Monte Carlo simulation failed: {str(e)}")
+                st.error("Please check your parameters and try again.")
 
     def display_system_status(self):
         """Display system status information"""
