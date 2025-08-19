@@ -35,6 +35,8 @@ from core.interpolation import interpolate_surface, adaptive_interpolation
 from core.advanced_interpolation import AdvancedSurfaceInterpolator, SurfaceSmoothing
 from core.gaussian_process import VolatilitySurfaceGP
 from core.surface_smoothing import SurfaceSmoothingEngine, smooth_volatility_surface
+from core.stochastic_vol import StochasticVolatilityEngine, create_heston_model, create_sabr_model
+from models.heston_advanced import HestonAdvanced, HestonParameters, SimulationScheme
 from visuals.plot_surface import plot_vol_surface_plotly
 from visuals.heatmap_greeks import GreeksHeatmapGenerator
 from utils.data_cleaning import OptionsDataCleaner
@@ -49,6 +51,11 @@ class RetroTerminal:
         self.data_cleaner = OptionsDataCleaner()
         self.surface_smoother = SurfaceSmoothingEngine()
         self.gp_model = None  # Will be initialized when needed
+        
+        # Initialize Stochastic Volatility Engine
+        self.sv_engine = StochasticVolatilityEngine()
+        self.heston_model = None
+        self.sabr_model = None
         
         # Expanded ticker universe - NASDAQ focus for maximum opportunities
         self.nasdaq_tickers = [
@@ -2453,12 +2460,13 @@ class RetroTerminal:
                 st.metric("AVG IMPLIED VOL", f"{avg_iv:.2%}")
             
             # Surface analysis tabs
-            surf_tab1, surf_tab2, surf_tab3, surf_tab4, surf_tab5 = st.tabs([
+            surf_tab1, surf_tab2, surf_tab3, surf_tab4, surf_tab5, surf_tab6 = st.tabs([
                 "3D VOLATILITY SURFACE",
                 "GREEKS HEATMAPS", 
                 "OPTIONS CHAIN DATA",
                 "PRICE ANALYSIS",
-                "SURFACE QUALITY"
+                "SURFACE QUALITY",
+                "HESTON MODEL"
             ])
             
             with surf_tab1:
@@ -2680,6 +2688,481 @@ class RetroTerminal:
                                         st.write(f"{key.upper()}: {value:.4f}")
                 else:
                     st.info("Run surface analysis to see quality metrics")
+            
+            with surf_tab6:
+                st.markdown("""
+                <div style="background: linear-gradient(90deg, #000800 0%, #001400 50%, #000800 100%); 
+                            border: 1px solid #00ff41; border-radius: 8px; padding: 15px; margin: 15px 0;">
+                    <div style="color: #00ff41; font-weight: bold; text-align: center;">
+                        HESTON STOCHASTIC VOLATILITY MODEL
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Heston model controls
+                heston_col1, heston_col2 = st.columns(2)
+                
+                with heston_col1:
+                    st.markdown("**HESTON PARAMETERS**")
+                    
+                    # Parameter controls
+                    kappa = st.slider("Mean Reversion Rate (κ)", 0.1, 10.0, 2.0, 0.1)
+                    theta = st.slider("Long-term Variance (θ)", 0.01, 0.5, 0.04, 0.01)
+                    sigma = st.slider("Vol of Vol (σ)", 0.1, 2.0, 0.3, 0.05)
+                    rho = st.slider("Correlation (ρ)", -0.99, 0.99, -0.7, 0.01)
+                    v0 = st.slider("Initial Variance (v₀)", 0.01, 0.5, 0.04, 0.01)
+                    
+                    # Check Feller condition
+                    feller_condition = 2 * kappa * theta > sigma**2
+                    if feller_condition:
+                        st.success(f"✓ Feller condition satisfied: 2κθ = {2*kappa*theta:.4f} > σ² = {sigma**2:.4f}")
+                    else:
+                        st.warning(f"⚠ Feller condition violated: 2κθ = {2*kappa*theta:.4f} ≤ σ² = {sigma**2:.4f}")
+                    
+                    # Calibration mode
+                    calibrate_mode = st.checkbox("Calibrate to Market Data", value=False)
+                    
+                with heston_col2:
+                    st.markdown("**MODEL ACTIONS**")
+                    
+                    run_heston = st.button("🚀 RUN HESTON MODEL", type="primary")
+                    monte_carlo = st.checkbox("Monte Carlo Simulation", value=True)
+                    n_paths = st.selectbox("MC Paths", [1000, 5000, 10000, 50000], index=2)
+                    
+                    simulation_scheme = st.selectbox("Simulation Scheme", 
+                                                   ["euler", "milstein"], index=0)
+                    
+                    # Visualization options
+                    st.markdown("**VISUALIZATION**")
+                    show_uncertainty = st.checkbox("Show Uncertainty Bands", value=True)
+                    show_smile = st.checkbox("Volatility Smile Analysis", value=True)
+                    show_term_structure = st.checkbox("Term Structure", value=True)
+                
+                if run_heston and options_df is not None:
+                    try:
+                        # Create Heston model with current parameters
+                        heston_params = HestonParameters(
+                            kappa=kappa, theta=theta, sigma=sigma, rho=rho, v0=v0
+                        )
+                        
+                        risk_free_rate = 0.05  # Default rate
+                        
+                        self.heston_model = HestonAdvanced(heston_params, current_price, risk_free_rate)
+                        
+                        # Register with SV engine
+                        self.sv_engine.register_model("Heston", self.heston_model)
+                        
+                        st.success("✅ Heston model initialized successfully!")
+                        
+                        # Display model parameters
+                        st.markdown("**INITIALIZED PARAMETERS:**")
+                        param_display_col1, param_display_col2 = st.columns(2)
+                        
+                        with param_display_col1:
+                            st.metric("Mean Reversion (κ)", f"{kappa:.3f}")
+                            st.metric("Long-term Var (θ)", f"{theta:.4f}")
+                            st.metric("Vol of Vol (σ)", f"{sigma:.3f}")
+                        
+                        with param_display_col2:
+                            st.metric("Correlation (ρ)", f"{rho:.3f}")
+                            st.metric("Initial Var (v₀)", f"{v0:.4f}")
+                            st.metric("Current Price (S₀)", f"${current_price:.2f}")
+                        
+                        if calibrate_mode:
+                            st.markdown("**CALIBRATION TO MARKET DATA**")
+                            with st.spinner("Calibrating Heston model to market data..."):
+                                try:
+                                    # Prepare market data for calibration
+                                    calibration_data = options_df.copy()
+                                    calibration_data['price'] = (calibration_data['bid'] + calibration_data['ask']) / 2
+                                    calibration_data['option_type'] = calibration_data['type'].str.lower()
+                                    
+                                    # Filter for liquid options
+                                    calibration_data = calibration_data[
+                                        (calibration_data['bid'] > 0.01) & 
+                                        (calibration_data['ask'] > 0) &
+                                        (calibration_data['volume'] > 5)
+                                    ].head(20)  # Limit for performance
+                                    
+                                    if len(calibration_data) > 5:
+                                        calibration_result = self.heston_model.calibrate_to_market(calibration_data)
+                                        
+                                        if calibration_result.convergence:
+                                            st.success("🎯 Calibration converged successfully!")
+                                            
+                                            # Display calibration results
+                                            calib_col1, calib_col2, calib_col3 = st.columns(3)
+                                            
+                                            with calib_col1:
+                                                st.metric("RMSE", f"{calibration_result.rmse:.6f}")
+                                                st.metric("MAE", f"{calibration_result.mae:.6f}")
+                                            
+                                            with calib_col2:
+                                                st.metric("Max Error", f"{calibration_result.max_error:.6f}")
+                                                st.metric("Iterations", calibration_result.iterations)
+                                            
+                                            with calib_col3:
+                                                # Optimized parameters
+                                                opt_params = calibration_result.parameters
+                                                st.markdown("**OPTIMIZED PARAMETERS:**")
+                                                st.write(f"κ: {opt_params.kappa:.4f}")
+                                                st.write(f"θ: {opt_params.theta:.4f}")
+                                                st.write(f"σ: {opt_params.sigma:.4f}")
+                                                st.write(f"ρ: {opt_params.rho:.4f}")
+                                                st.write(f"v₀: {opt_params.v0:.4f}")
+                                            
+                                            # Update model with calibrated parameters
+                                            self.heston_model = HestonAdvanced(
+                                                opt_params, current_price, risk_free_rate
+                                            )
+                                            self.sv_engine.register_model("Heston", self.heston_model)
+                                        else:
+                                            st.warning("⚠ Calibration did not converge. Using manual parameters.")
+                                    else:
+                                        st.warning("Insufficient liquid options for calibration.")
+                                except Exception as e:
+                                    st.error(f"Calibration failed: {str(e)}")
+                        
+                        # Option pricing with Heston model
+                        st.markdown("**HESTON OPTION PRICING**")
+                        
+                        # Select a few strikes for demonstration
+                        available_strikes = sorted(options_df['strike'].unique())
+                        if len(available_strikes) > 0:
+                            strike_range = st.select_slider(
+                                "Strike Range for Analysis",
+                                options=available_strikes,
+                                value=(available_strikes[len(available_strikes)//3], 
+                                      available_strikes[len(available_strikes)*2//3])
+                            )
+                            
+                            analysis_strikes = [s for s in available_strikes 
+                                              if strike_range[0] <= s <= strike_range[1]][:10]
+                            
+                            # Time to expiration selection
+                            available_expiries = sorted(options_df['expiry'].unique())
+                            if len(available_expiries) > 0:
+                                selected_expiry = st.selectbox(
+                                    "Select Expiry for Analysis",
+                                    available_expiries,
+                                    format_func=lambda x: f"{x:.2f} years"
+                                )
+                                
+                                # Calculate Heston prices
+                                heston_prices = []
+                                bs_prices = []
+                                market_prices = []
+                                
+                                for strike in analysis_strikes:
+                                    # Heston price
+                                    heston_call = self.heston_model.fft_option_price(
+                                        strike, selected_expiry, 'call'
+                                    )[0]
+                                    heston_prices.append(heston_call)
+                                    
+                                    # Black-Scholes comparison
+                                    market_iv = 0.2  # Default if no IV available
+                                    option_subset = options_df[
+                                        (options_df['strike'] == strike) & 
+                                        (np.abs(options_df['expiry'] - selected_expiry) < 0.01)
+                                    ]
+                                    if len(option_subset) > 0:
+                                        market_price = (option_subset['bid'].iloc[0] + 
+                                                      option_subset['ask'].iloc[0]) / 2
+                                        market_prices.append(market_price)
+                                        
+                                        # Calculate implied vol
+                                        try:
+                                            market_iv = implied_volatility(
+                                                market_price, current_price, strike, 
+                                                selected_expiry, risk_free_rate, 'call'
+                                            )
+                                        except:
+                                            market_iv = 0.2
+                                    else:
+                                        market_prices.append(np.nan)
+                                    
+                                    bs_price = black_scholes_price(
+                                        current_price, strike, selected_expiry, 
+                                        risk_free_rate, market_iv, 'call'
+                                    )
+                                    bs_prices.append(bs_price)
+                                
+                                # Display price comparison
+                                price_comparison = pd.DataFrame({
+                                    'Strike': analysis_strikes,
+                                    'Heston Price': heston_prices,
+                                    'Black-Scholes': bs_prices,
+                                    'Market Price': market_prices,
+                                    'Heston vs BS': np.array(heston_prices) - np.array(bs_prices)
+                                })
+                                
+                                st.markdown("**PRICE COMPARISON TABLE**")
+                                st.dataframe(price_comparison.round(4), use_container_width=True)
+                                
+                                # Price comparison chart
+                                fig_prices = go.Figure()
+                                
+                                fig_prices.add_trace(go.Scatter(
+                                    x=analysis_strikes, y=heston_prices,
+                                    mode='lines+markers', name='Heston Model',
+                                    line=dict(color='#00ff41', width=2),
+                                    marker=dict(size=6)
+                                ))
+                                
+                                fig_prices.add_trace(go.Scatter(
+                                    x=analysis_strikes, y=bs_prices,
+                                    mode='lines+markers', name='Black-Scholes',
+                                    line=dict(color='#ff6b35', width=2, dash='dash'),
+                                    marker=dict(size=6)
+                                ))
+                                
+                                if not all(np.isnan(market_prices)):
+                                    fig_prices.add_trace(go.Scatter(
+                                        x=analysis_strikes, y=market_prices,
+                                        mode='markers', name='Market Prices',
+                                        marker=dict(color='#ffff00', size=8, symbol='x')
+                                    ))
+                                
+                                fig_prices.update_layout(
+                                    title=f"Option Prices vs Strike (T={selected_expiry:.2f}Y)",
+                                    xaxis_title="Strike Price",
+                                    yaxis_title="Option Price",
+                                    template="plotly_dark",
+                                    paper_bgcolor='black',
+                                    plot_bgcolor='black',
+                                    font=dict(color='#00ff41')
+                                )
+                                
+                                st.plotly_chart(fig_prices, use_container_width=True)
+                        
+                        # Volatility smile analysis
+                        if show_smile:
+                            st.markdown("**VOLATILITY SMILE ANALYSIS**")
+                            
+                            with st.spinner("Generating volatility smile..."):
+                                try:
+                                    smile_data = self.sv_engine.generate_volatility_smile(
+                                        "Heston", selected_expiry, (current_price*0.8, current_price*1.2), 25
+                                    )
+                                    
+                                    fig_smile = go.Figure()
+                                    
+                                    fig_smile.add_trace(go.Scatter(
+                                        x=smile_data['moneyness'],
+                                        y=smile_data['implied_volatility'],
+                                        mode='lines+markers',
+                                        name='Heston IV Smile',
+                                        line=dict(color='#00ff41', width=3),
+                                        marker=dict(size=5)
+                                    ))
+                                    
+                                    fig_smile.update_layout(
+                                        title=f"Heston Implied Volatility Smile (T={selected_expiry:.2f}Y)",
+                                        xaxis_title="Moneyness (K/S₀)",
+                                        yaxis_title="Implied Volatility",
+                                        template="plotly_dark",
+                                        paper_bgcolor='black',
+                                        plot_bgcolor='black',
+                                        font=dict(color='#00ff41')
+                                    )
+                                    
+                                    st.plotly_chart(fig_smile, use_container_width=True)
+                                    
+                                    # Smile metrics
+                                    smile_col1, smile_col2, smile_col3 = st.columns(3)
+                                    
+                                    with smile_col1:
+                                        atm_iv = smile_data[
+                                            smile_data['moneyness'].sub(1.0).abs().idxmin()
+                                        ]['implied_volatility']
+                                        st.metric("ATM IV", f"{atm_iv:.2%}")
+                                    
+                                    with smile_col2:
+                                        iv_range = smile_data['implied_volatility'].max() - \
+                                                  smile_data['implied_volatility'].min()
+                                        st.metric("IV Range", f"{iv_range:.2%}")
+                                    
+                                    with smile_col3:
+                                        # Smile skew (25-delta put vs call)
+                                        otm_put_iv = smile_data[smile_data['moneyness'] < 0.9]['implied_volatility'].mean()
+                                        otm_call_iv = smile_data[smile_data['moneyness'] > 1.1]['implied_volatility'].mean()
+                                        skew = otm_put_iv - otm_call_iv
+                                        st.metric("25Δ Skew", f"{skew:.2%}")
+                                
+                                except Exception as e:
+                                    st.error(f"Volatility smile generation failed: {str(e)}")
+                        
+                        # Term structure analysis
+                        if show_term_structure:
+                            st.markdown("**VOLATILITY TERM STRUCTURE**")
+                            
+                            with st.spinner("Analyzing term structure..."):
+                                try:
+                                    expiry_range = np.array([0.08, 0.25, 0.5, 1.0, 2.0])  # 1M to 2Y
+                                    term_data = self.sv_engine.term_structure_analysis(
+                                        "Heston", expiry_range, current_price
+                                    )
+                                    
+                                    fig_term = go.Figure()
+                                    
+                                    fig_term.add_trace(go.Scatter(
+                                        x=term_data['time_to_expiry_days'],
+                                        y=term_data['atm_implied_volatility'],
+                                        mode='lines+markers',
+                                        name='ATM IV Term Structure',
+                                        line=dict(color='#00ff41', width=3),
+                                        marker=dict(size=7)
+                                    ))
+                                    
+                                    fig_term.update_layout(
+                                        title="Heston ATM Implied Volatility Term Structure",
+                                        xaxis_title="Days to Expiry",
+                                        yaxis_title="Implied Volatility",
+                                        template="plotly_dark",
+                                        paper_bgcolor='black',
+                                        plot_bgcolor='black',
+                                        font=dict(color='#00ff41')
+                                    )
+                                    
+                                    st.plotly_chart(fig_term, use_container_width=True)
+                                    
+                                    # Term structure metrics
+                                    term_col1, term_col2, term_col3 = st.columns(3)
+                                    
+                                    with term_col1:
+                                        short_term_iv = term_data.iloc[0]['atm_implied_volatility']
+                                        st.metric("1M IV", f"{short_term_iv:.2%}")
+                                    
+                                    with term_col2:
+                                        long_term_iv = term_data.iloc[-1]['atm_implied_volatility']
+                                        st.metric("2Y IV", f"{long_term_iv:.2%}")
+                                    
+                                    with term_col3:
+                                        term_slope = (long_term_iv - short_term_iv) / \
+                                                   (term_data.iloc[-1]['expiry'] - term_data.iloc[0]['expiry'])
+                                        st.metric("Term Slope", f"{term_slope:.3f}/Y")
+                                
+                                except Exception as e:
+                                    st.error(f"Term structure analysis failed: {str(e)}")
+                        
+                        # Monte Carlo simulation
+                        if monte_carlo:
+                            st.markdown("**MONTE CARLO SIMULATION**")
+                            
+                            with st.spinner(f"Running Monte Carlo simulation ({n_paths:,} paths)..."):
+                                try:
+                                    # Run MC simulation
+                                    mc_time = 1.0  # 1 year simulation
+                                    mc_steps = 252  # Daily steps
+                                    
+                                    S_paths, v_paths = self.heston_model.monte_carlo_simulation(
+                                        mc_time, mc_steps, n_paths, 
+                                        SimulationScheme.EULER if simulation_scheme == "euler" else SimulationScheme.MILSTEIN
+                                    )
+                                    
+                                    # MC results
+                                    mc_col1, mc_col2, mc_col3, mc_col4 = st.columns(4)
+                                    
+                                    with mc_col1:
+                                        final_prices = S_paths[:, -1]
+                                        st.metric("Final S Mean", f"${np.mean(final_prices):.2f}")
+                                        st.metric("Final S Std", f"${np.std(final_prices):.2f}")
+                                    
+                                    with mc_col2:
+                                        final_vars = v_paths[:, -1]
+                                        st.metric("Final Vol Mean", f"{np.sqrt(np.mean(final_vars)):.2%}")
+                                        st.metric("Final Vol Std", f"{np.sqrt(np.std(final_vars)):.2%}")
+                                    
+                                    with mc_col3:
+                                        returns = (final_prices / current_price - 1) * 100
+                                        st.metric("Return Mean", f"{np.mean(returns):.1f}%")
+                                        st.metric("Return Std", f"{np.std(returns):.1f}%")
+                                    
+                                    with mc_col4:
+                                        # Risk metrics
+                                        var_95 = np.percentile(returns, 5)
+                                        max_drawdown = np.min(returns)
+                                        st.metric("VaR (95%)", f"{var_95:.1f}%")
+                                        st.metric("Max Drawdown", f"{max_drawdown:.1f}%")
+                                    
+                                    # Plot sample paths
+                                    n_plot_paths = min(100, n_paths)
+                                    time_grid = np.linspace(0, mc_time, mc_steps + 1)
+                                    
+                                    fig_mc = go.Figure()
+                                    
+                                    # Plot sample price paths
+                                    for i in range(0, n_plot_paths, 5):
+                                        fig_mc.add_trace(go.Scatter(
+                                            x=time_grid,
+                                            y=S_paths[i, :],
+                                            mode='lines',
+                                            line=dict(color='#00ff41', width=0.5, opacity=0.3),
+                                            showlegend=False
+                                        ))
+                                    
+                                    # Add mean path
+                                    mean_path = np.mean(S_paths[:n_plot_paths], axis=0)
+                                    fig_mc.add_trace(go.Scatter(
+                                        x=time_grid,
+                                        y=mean_path,
+                                        mode='lines',
+                                        name='Mean Path',
+                                        line=dict(color='#ff6b35', width=3)
+                                    ))
+                                    
+                                    fig_mc.update_layout(
+                                        title=f"Heston Monte Carlo Price Paths ({n_plot_paths} shown)",
+                                        xaxis_title="Time (Years)",
+                                        yaxis_title="Stock Price",
+                                        template="plotly_dark",
+                                        paper_bgcolor='black',
+                                        plot_bgcolor='black',
+                                        font=dict(color='#00ff41')
+                                    )
+                                    
+                                    st.plotly_chart(fig_mc, use_container_width=True)
+                                    
+                                except Exception as e:
+                                    st.error(f"Monte Carlo simulation failed: {str(e)}")
+                        
+                        # Greeks calculation
+                        st.markdown("**HESTON GREEKS**")
+                        
+                        try:
+                            # Calculate Greeks for ATM option
+                            atm_strike = current_price
+                            greeks = self.heston_model.calculate_greeks_mc(
+                                atm_strike, selected_expiry, 'call', 10000
+                            )
+                            
+                            greeks_col1, greeks_col2, greeks_col3 = st.columns(3)
+                            
+                            with greeks_col1:
+                                st.metric("Delta (Δ)", f"{greeks['delta']:.4f}")
+                                st.metric("Gamma (Γ)", f"{greeks['gamma']:.6f}")
+                            
+                            with greeks_col2:
+                                st.metric("Vega (ν)", f"{greeks['vega']:.4f}")
+                                st.metric("Theta (Θ)", f"{greeks['theta']:.4f}")
+                            
+                            with greeks_col3:
+                                st.metric("Rho (ρ)", f"{greeks['rho']:.4f}")
+                                st.metric("Option Price", f"${greeks['price']:.4f}")
+                        
+                        except Exception as e:
+                            st.error(f"Greeks calculation failed: {str(e)}")
+                        
+                    except Exception as e:
+                        st.error(f"Heston model initialization failed: {str(e)}")
+                        st.error("Please check your parameters and try again.")
+                
+                elif run_heston and options_df is None:
+                    st.warning("Please load options data first by analyzing a ticker in the Surface Analysis tab.")
+                
+                else:
+                    st.info("Configure Heston parameters above and click 'RUN HESTON MODEL' to begin analysis.")
 
     def display_system_status(self):
         """Display system status information"""
