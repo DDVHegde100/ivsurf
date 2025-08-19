@@ -30,7 +30,6 @@ import warnings
 from scipy import stats, optimize, linalg
 from scipy.interpolate import interp1d
 import concurrent.futures
-from numba import jit, njit
 import time
 
 # Try to import advanced numerical libraries
@@ -39,14 +38,19 @@ try:
     NUMBA_AVAILABLE = True
 except ImportError:
     NUMBA_AVAILABLE = False
-    # Create dummy decorators
+    # Create dummy decorators that do nothing
     def jit(*args, **kwargs):
         def decorator(func):
             return func
+        if len(args) == 1 and callable(args[0]):
+            return args[0]  # Handle @jit without parentheses
         return decorator
+    
     def njit(*args, **kwargs):
         def decorator(func):
             return func
+        if len(args) == 1 and callable(args[0]):
+            return args[0]  # Handle @njit without parentheses
         return decorator
 
 class OptionType(Enum):

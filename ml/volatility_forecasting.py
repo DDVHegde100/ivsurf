@@ -153,48 +153,105 @@ class TechnicalFeatureEngineer:
         if selected_features is None:
             selected_features = ['RSI', 'MACD', 'ATR', 'Bollinger Bands', 'Price Returns', 'Volatility Clustering']
         
-        # Start with price features
-        features = self.create_price_features(data)
+        # Ensure we have minimum data
+        if len(data) < 50:
+            raise ValueError(f"Insufficient data: need at least 50 rows, got {len(data)}")
+        
+        # Start with empty DataFrame
+        features = pd.DataFrame(index=data.index)
+        
+        # Add price features first (always include these)
+        try:
+            price_features = self.create_price_features(data)
+            if not price_features.empty:
+                features = pd.concat([features, price_features], axis=1)
+        except Exception as e:
+            print(f"Warning: Could not create price features: {e}")
         
         # Add technical indicators based on selection
         if 'RSI' in selected_features:
-            rsi_features = self.create_rsi_features(data)
-            features = pd.concat([features, rsi_features], axis=1)
+            try:
+                rsi_features = self.create_rsi_features(data)
+                if not rsi_features.empty:
+                    features = pd.concat([features, rsi_features], axis=1)
+            except Exception as e:
+                print(f"Warning: Could not create RSI features: {e}")
         
         if 'MACD' in selected_features:
-            macd_features = self.create_macd_features(data)
-            features = pd.concat([features, macd_features], axis=1)
+            try:
+                macd_features = self.create_macd_features(data)
+                if not macd_features.empty:
+                    features = pd.concat([features, macd_features], axis=1)
+            except Exception as e:
+                print(f"Warning: Could not create MACD features: {e}")
         
         if 'ATR' in selected_features:
-            atr_features = self.create_atr_features(data)
-            features = pd.concat([features, atr_features], axis=1)
+            try:
+                atr_features = self.create_atr_features(data)
+                if not atr_features.empty:
+                    features = pd.concat([features, atr_features], axis=1)
+            except Exception as e:
+                print(f"Warning: Could not create ATR features: {e}")
         
         if 'Bollinger Bands' in selected_features:
-            bb_features = self.create_bollinger_features(data)
-            features = pd.concat([features, bb_features], axis=1)
+            try:
+                bb_features = self.create_bollinger_features(data)
+                if not bb_features.empty:
+                    features = pd.concat([features, bb_features], axis=1)
+            except Exception as e:
+                print(f"Warning: Could not create Bollinger features: {e}")
         
         if 'Volatility Clustering' in selected_features:
-            vol_features = self.create_volatility_features(data)
-            features = pd.concat([features, vol_features], axis=1)
+            try:
+                vol_features = self.create_volatility_features(data)
+                if not vol_features.empty:
+                    features = pd.concat([features, vol_features], axis=1)
+            except Exception as e:
+                print(f"Warning: Could not create volatility features: {e}")
         
         # Volume features if available
         if 'Volume' in data.columns:
-            volume_features = self.create_volume_features(data)
-            features = pd.concat([features, volume_features], axis=1)
+            try:
+                volume_features = self.create_volume_features(data)
+                if not volume_features.empty:
+                    features = pd.concat([features, volume_features], axis=1)
+            except Exception as e:
+                print(f"Warning: Could not create volume features: {e}")
         
         # Market microstructure features
-        micro_features = self.create_microstructure_features(data)
-        features = pd.concat([features, micro_features], axis=1)
+        try:
+            micro_features = self.create_microstructure_features(data)
+            if not micro_features.empty:
+                features = pd.concat([features, micro_features], axis=1)
+        except Exception as e:
+            print(f"Warning: Could not create microstructure features: {e}")
         
         # Lag features
-        lag_features = self.create_lag_features(features)
-        features = pd.concat([features, lag_features], axis=1)
+        try:
+            lag_features = self.create_lag_features(features)
+            if not lag_features.empty:
+                features = pd.concat([features, lag_features], axis=1)
+        except Exception as e:
+            print(f"Warning: Could not create lag features: {e}")
+        
+        # Ensure we have some features
+        if features.empty:
+            raise ValueError("No features could be created from the data")
         
         # Store feature names
         self.feature_names = features.columns.tolist()
         
-        # Drop NaN values
+        # Drop NaN values but keep some data
+        initial_rows = len(features)
         features = features.dropna()
+        
+        if features.empty:
+            raise ValueError("All features contained NaN values after processing")
+        
+        if len(features) < 10:
+            raise ValueError(f"Too few valid samples after cleaning: {len(features)} (started with {initial_rows})")
+        
+        print(f"Created {len(features.columns)} features with {len(features)} valid samples")
         
         return features
 
@@ -283,39 +340,79 @@ class TechnicalFeatureEngineer:
     def create_rsi_features(self, data: pd.DataFrame) -> pd.DataFrame:
         """Create RSI-based features"""
         features = pd.DataFrame(index=data.index)
-        prices = data['Close'].values
+        
+        # Extract price data properly
+        try:
+            if 'Close' in data.columns:
+                prices = data['Close'].values.flatten()  # Ensure 1D array
+            else:
+                warnings.warn("No Close price data found for RSI calculation")
+                return features
+        except Exception as e:
+            warnings.warn(f"Could not extract price data for RSI: {e}")
+            return features
+        
+        # Ensure we have enough data
+        if len(prices) < 50:
+            return features
         
         # RSI with different periods
         for period in [14, 21, 50]:
-            rsi = calculate_rsi(prices, window=period)
-            rsi_series = pd.Series(rsi, index=data.index)
-            
-            features[f'rsi_{period}'] = rsi_series
-            features[f'rsi_{period}_oversold'] = (rsi_series < 30).astype(int)
-            features[f'rsi_{period}_overbought'] = (rsi_series > 70).astype(int)
-            features[f'rsi_{period}_momentum'] = rsi_series - rsi_series.shift(5)  # 5-day momentum
+            try:
+                rsi = calculate_rsi(prices, window=period)
+                rsi_series = pd.Series(rsi, index=data.index)
+                
+                # Only add if we have valid data
+                if not rsi_series.isnull().all():
+                    features[f'rsi_{period}'] = rsi_series
+                    features[f'rsi_{period}_oversold'] = (rsi_series < 30).astype(int)
+                    features[f'rsi_{period}_overbought'] = (rsi_series > 70).astype(int)
+                    features[f'rsi_{period}_momentum'] = rsi_series - rsi_series.shift(5)
+            except Exception as e:
+                warnings.warn(f"Could not calculate RSI for period {period}: {e}")
+                continue
         
         return features
     
     def create_macd_features(self, data: pd.DataFrame) -> pd.DataFrame:
         """Create MACD-based features"""
         features = pd.DataFrame(index=data.index)
-        prices = data['Close'].values
+        
+        # Extract price data properly
+        try:
+            if 'Close' in data.columns:
+                prices = data['Close'].values.flatten()  # Ensure 1D array
+            else:
+                warnings.warn("No Close price data found for MACD calculation")
+                return features
+        except Exception as e:
+            warnings.warn(f"Could not extract price data for MACD: {e}")
+            return features
+        
+        # Ensure we have enough data
+        if len(prices) < 50:
+            return features
         
         # MACD with different parameters
         for fast, slow, signal in [(12, 26, 9), (5, 35, 5)]:
-            macd_line, signal_line, histogram = calculate_macd(prices, fast, slow, signal)
-            suffix = f"_{fast}_{slow}_{signal}"
-            
-            macd_series = pd.Series(macd_line, index=data.index)
-            signal_series = pd.Series(signal_line, index=data.index)
-            histogram_series = pd.Series(histogram, index=data.index)
-            
-            features[f'macd{suffix}'] = macd_series
-            features[f'macd_signal{suffix}'] = signal_series
-            features[f'macd_histogram{suffix}'] = histogram_series
-            features[f'macd_cross{suffix}'] = (macd_series > signal_series).astype(int)
-            features[f'macd_divergence{suffix}'] = macd_series - signal_series
+            try:
+                macd_line, signal_line, histogram = calculate_macd(prices, fast, slow, signal)
+                suffix = f"_{fast}_{slow}_{signal}"
+                
+                macd_series = pd.Series(macd_line, index=data.index)
+                signal_series = pd.Series(signal_line, index=data.index)
+                histogram_series = pd.Series(histogram, index=data.index)
+                
+                # Only add if we have valid data
+                if not macd_series.isnull().all():
+                    features[f'macd{suffix}'] = macd_series
+                    features[f'macd_signal{suffix}'] = signal_series
+                    features[f'macd_histogram{suffix}'] = histogram_series
+                    features[f'macd_cross{suffix}'] = (macd_series > signal_series).astype(int)
+                    features[f'macd_divergence{suffix}'] = macd_series - signal_series
+            except Exception as e:
+                warnings.warn(f"Could not calculate MACD for {fast},{slow},{signal}: {e}")
+                continue
         
         return features
     
@@ -323,18 +420,64 @@ class TechnicalFeatureEngineer:
         """Create ATR-based features"""
         features = pd.DataFrame(index=data.index)
         
+        # Extract OHLC data properly
+        try:
+            if all(col in data.columns for col in ['High', 'Low', 'Close']):
+                high = data['High'].values.flatten()
+                low = data['Low'].values.flatten()
+                close = data['Close'].values.flatten()
+            else:
+                warnings.warn("Insufficient OHLC data for ATR calculation")
+                return features
+        except Exception as e:
+            warnings.warn(f"Could not extract OHLC data for ATR: {e}")
+            return features
+        
+        # Ensure we have enough data
+        if len(close) < 50:
+            return features
+        
+        # ATR with different periods
+        for period in [14, 21, 50]:
+            try:
+                atr = calculate_atr(high, low, close, window=period)
+                atr_series = pd.Series(atr, index=data.index)
+                
+                # Only add if we have valid data
+                if not atr_series.isnull().all():
+                    features[f'atr_{period}'] = atr_series
+                    features[f'atr_{period}_pct'] = atr_series / close
+                    features[f'atr_{period}_momentum'] = atr_series - atr_series.shift(5)
+                    features[f'atr_{period}_normalized'] = atr_series / atr_series.rolling(50).mean()
+            except Exception as e:
+                warnings.warn(f"Could not calculate ATR for period {period}: {e}")
+                continue
+        
+        return features
+        features = pd.DataFrame(index=data.index)
+        
+        # Ensure we have enough data
+        if len(data) < 50:
+            return features
+        
         high = data['High'].values
         low = data['Low'].values
         close = data['Close'].values
         
         # ATR with different periods
         for period in [14, 21, 50]:
-            atr = calculate_atr(high, low, close, window=period)
-            atr_series = pd.Series(atr, index=data.index)
-            
-            features[f'atr_{period}'] = atr_series
-            features[f'atr_{period}_normalized'] = atr_series / close
-            features[f'atr_{period}_percentile'] = atr_series.rolling(100).rank(pct=True)
+            try:
+                atr = calculate_atr(high, low, close, window=period)
+                atr_series = pd.Series(atr, index=data.index)
+                
+                # Only add if we have valid data
+                if not atr_series.isnull().all():
+                    features[f'atr_{period}'] = atr_series
+                    features[f'atr_{period}_normalized'] = atr_series / close
+                    features[f'atr_{period}_percentile'] = atr_series.rolling(100).rank(pct=True)
+            except Exception as e:
+                print(f"Warning: Could not calculate ATR for period {period}: {e}")
+                continue
         
         return features
     
