@@ -784,7 +784,17 @@ class RetroTerminal:
                 'aggressive_target': gain_potential['aggressive_target'],
                 'probability_positive': gain_potential['probability_positive'],
                 'confidence_level': gain_potential['confidence_level'],
-                'risk_reward_ratio': gain_potential['risk_reward_ratio']
+                'risk_reward_ratio': gain_potential['risk_reward_ratio'],
+                # NEW: Enhanced categorization data
+                'expected_category': gain_potential['expected_category'],
+                'expected_low': gain_potential['expected_low'],
+                'expected_medium': gain_potential['expected_medium'],
+                'expected_high': gain_potential['expected_high'],
+                'average_gain_pct': gain_potential['average_gain_pct'],
+                # NEW: Advanced risk metrics
+                'sharpe_estimate': gain_potential['sharpe_estimate'],
+                'max_drawdown_risk': gain_potential['max_drawdown_risk'],
+                'value_at_risk_5pct': gain_potential['value_at_risk_5pct']
             }
             
         except Exception as e:
@@ -1974,7 +1984,7 @@ class RetroTerminal:
         
         # 2. Tomorrow's predicted winners (MAIN FOCUS - fresh opportunities)
         tomorrow_gains = df.nlargest(20, 'tomorrow_gain_score')[
-            ['ticker', 'price', 'expected_gain_pct', 'probability_positive', 'confidence_level', 'conservative_target', 'tomorrow_gain_score', 'gain_category', 'avg_expected_gain']
+            ['ticker', 'price', 'expected_gain_pct', 'probability_positive', 'confidence_level', 'conservative_target', 'tomorrow_gain_score', 'expected_category', 'average_gain_pct']
         ]
         
         # 3. Yesterday's options plays
@@ -2067,14 +2077,14 @@ class RetroTerminal:
                 lambda x: f"<span class='profit-high'>+{x:.2f}%</span>"
             )
             tomorrow_gains_display['TARGET'] = tomorrow_gains_display['conservative_target'].apply(lambda x: f"${x:.2f}")
-            tomorrow_gains_display['CATEGORY'] = tomorrow_gains_display['gain_category']
+            tomorrow_gains_display['CATEGORY'] = tomorrow_gains_display['expected_category']
             tomorrow_gains_display['WIN_PROB'] = tomorrow_gains_display['probability_positive'].apply(
                 lambda x: f"<span class='profit-medium'>{x:.0f}%</span>" if x > 70 else f"{x:.0f}%"
             )
             tomorrow_gains_display['CONFIDENCE'] = tomorrow_gains_display['confidence_level'].apply(
                 lambda x: f"<span class='profit-high'>{x:.0f}%</span>" if x > 80 else f"<span class='profit-medium'>{x:.0f}%</span>"
             )
-            tomorrow_gains_display['AVG_GAIN'] = tomorrow_gains_display['avg_expected_gain'].apply(
+            tomorrow_gains_display['AVG_GAIN'] = tomorrow_gains_display['average_gain_pct'].apply(
                 lambda x: f"<span class='profit-high'>+{x:.1f}%</span>" if x > 0 else f"{x:.1f}%"
             )
             tomorrow_gains_display['SCORE'] = tomorrow_gains_display['tomorrow_gain_score'].apply(lambda x: f"{x:.0f}")
@@ -2090,12 +2100,12 @@ class RetroTerminal:
             ultra_high_confidence = len(tomorrow_gains[tomorrow_gains['confidence_level'] > 90])
             
             # Advanced statistical analysis
-            high_category = len(tomorrow_gains[tomorrow_gains['gain_category'] == 'HIGH'])
-            medium_category = len(tomorrow_gains[tomorrow_gains['gain_category'] == 'MEDIUM'])
-            low_category = len(tomorrow_gains[tomorrow_gains['gain_category'] == 'LOW'])
+            high_category = len(tomorrow_gains[tomorrow_gains['expected_category'] == 'HIGH'])
+            medium_category = len(tomorrow_gains[tomorrow_gains['expected_category'] == 'MEDIUM'])
+            low_category = len(tomorrow_gains[tomorrow_gains['expected_category'] == 'LOW'])
             
             # Calculate sophisticated metrics
-            weighted_avg_gain = (tomorrow_gains['avg_expected_gain'] * tomorrow_gains['confidence_level']).sum() / tomorrow_gains['confidence_level'].sum()
+            weighted_avg_gain = (tomorrow_gains['average_gain_pct'] * tomorrow_gains['confidence_level']).sum() / tomorrow_gains['confidence_level'].sum()
             max_predicted_gain = tomorrow_gains['expected_gain_pct'].max()
             min_risk_pick = tomorrow_gains.loc[tomorrow_gains['confidence_level'].idxmax(), 'ticker']
             
