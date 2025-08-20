@@ -28,8 +28,11 @@ try:
     from risk.stress_testing import StressTester
     from models.regime_switching import MarkovRegimeSwitching
     from models.garch import GARCHModel, VolatilityBreakpointDetection
+    from models.volatility_clustering import VolatilityClusteringAnalyzer
+    from models.regime_pricing import RegimeDependentPricer
     RISK_MODULES_AVAILABLE = True
     REGIME_MODELS_AVAILABLE = True
+    CLUSTERING_ANALYSIS_AVAILABLE = True
 except ImportError:
     # Fallback if modules not available
     VaRAnalyzer = None
@@ -37,8 +40,11 @@ except ImportError:
     MarkovRegimeSwitching = None
     GARCHModel = None
     VolatilityBreakpointDetection = None
+    VolatilityClusteringAnalyzer = None
+    RegimeDependentPricer = None
     RISK_MODULES_AVAILABLE = False
     REGIME_MODELS_AVAILABLE = False
+    CLUSTERING_ANALYSIS_AVAILABLE = False
 import sys
 import os
 from datetime import datetime, timedelta
@@ -3006,6 +3012,52 @@ class RetroTerminal:
             icss_results = breakpoint_detector.detect_breakpoints(returns, method='ICSS')
             cusum_results = breakpoint_detector.detect_breakpoints(returns, method='CUSUM')
             
+            # 4. Advanced Volatility Clustering Analysis
+            clustering_results = None
+            regime_pricing_results = None
+            
+            if CLUSTERING_ANALYSIS_AVAILABLE:
+                try:
+                    clustering_analyzer = VolatilityClusteringAnalyzer()
+                    
+                    # Analyze clustering for this single asset
+                    returns_dict = {ticker: returns}
+                    clustering_results = clustering_analyzer.analyze_clustering(returns_dict)
+                    
+                    # Regime-dependent option pricing analysis
+                    if regime_fit['converged']:
+                        regime_pricer = RegimeDependentPricer(n_regimes=2)
+                        calibration = regime_pricer.calibrate_regime_model(returns)
+                        
+                        if calibration['success']:
+                            # Example option pricing for demonstration
+                            current_price = data['Close'].iloc[-1]
+                            strike_price = current_price * 1.05  # 5% OTM call
+                            time_to_expiry = 0.25  # 3 months
+                            risk_free_rate = 0.05  # 5%
+                            
+                            option_analysis = regime_pricer.price_option_regime_dependent(
+                                S=current_price,
+                                K=strike_price, 
+                                T=time_to_expiry,
+                                r=risk_free_rate,
+                                option_type='call'
+                            )
+                            
+                            regime_pricing_results = {
+                                'calibration': calibration,
+                                'example_option': {
+                                    'current_price': current_price,
+                                    'strike_price': strike_price,
+                                    'time_to_expiry': time_to_expiry,
+                                    'pricing_results': option_analysis
+                                }
+                            }
+                            
+                except Exception as e:
+                    clustering_results = {'error': f'Clustering analysis failed: {str(e)}'}
+                    regime_pricing_results = {'error': f'Regime pricing failed: {str(e)}'}
+            
             return {
                 'ticker': ticker,
                 'period': period,
@@ -3035,6 +3087,12 @@ class RetroTerminal:
                     'icss_results': icss_results,
                     'cusum_results': cusum_results
                 },
+                
+                # Advanced Clustering Analysis
+                'clustering_analysis': clustering_results,
+                
+                # Regime-Dependent Pricing
+                'regime_pricing': regime_pricing_results,
                 
                 'success': True
             }
@@ -3199,6 +3257,232 @@ class RetroTerminal:
             )
             
             st.plotly_chart(fig, use_container_width=True)
+        
+        # Advanced Volatility Clustering Analysis
+        clustering_results = results.get('clustering_analysis')
+        if clustering_results and not clustering_results.get('error'):
+            self._display_clustering_analysis(clustering_results, results['ticker'])
+        
+        # Regime-Dependent Option Pricing
+        regime_pricing = results.get('regime_pricing')
+        if regime_pricing and not regime_pricing.get('error'):
+            self._display_regime_pricing_analysis(regime_pricing, results['ticker'])
+    
+    def _display_clustering_analysis(self, clustering_results, ticker):
+        """Display advanced volatility clustering analysis"""
+        
+        st.markdown("### 🔬 Advanced Volatility Clustering Analysis")
+        
+        individual_analysis = clustering_results.get('individual_analysis', {}).get(ticker, {})
+        dynamic_clustering = clustering_results.get('dynamic_clustering', {})
+        volatility_states = clustering_results.get('volatility_states', {})
+        
+        if individual_analysis:
+            # Basic clustering tests
+            basic_tests = individual_analysis.get('basic_tests', {})
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                ljung_box = basic_tests.get('ljung_box_squared', {})
+                if ljung_box and not ljung_box.get('error'):
+                    is_significant = ljung_box.get('significant', False)
+                    st.metric(
+                        "Ljung-Box Test (Squared Returns)",
+                        f"p-value: {ljung_box.get('p_value', 0):.4f}",
+                        delta="Clustering Detected" if is_significant else "No Clustering"
+                    )
+            
+            with col2:
+                arch_test = basic_tests.get('arch_lm', {})
+                if arch_test and not arch_test.get('error'):
+                    is_significant = arch_test.get('significant', False)
+                    st.metric(
+                        "ARCH-LM Test",
+                        f"p-value: {arch_test.get('p_value', 0):.4f}",
+                        delta="ARCH Effects" if is_significant else "No ARCH Effects"
+                    )
+            
+            # Multi-scale clustering metrics
+            multi_scale = individual_analysis.get('multi_scale_clustering', {})
+            if multi_scale:
+                st.markdown("#### 📊 Multi-Scale Clustering Intensity")
+                
+                clustering_ratios = []
+                window_sizes = []
+                
+                for window_key, metrics in multi_scale.items():
+                    if not metrics.get('error'):
+                        window_size = window_key.replace('window_', '')
+                        clustering_ratio = metrics.get('clustering_ratio', 0)
+                        
+                        if clustering_ratio > 0:
+                            window_sizes.append(int(window_size))
+                            clustering_ratios.append(clustering_ratio)
+                
+                if clustering_ratios:
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatter(
+                        x=window_sizes,
+                        y=clustering_ratios,
+                        mode='lines+markers',
+                        name='Clustering Ratio',
+                        line=dict(color='cyan', width=2)
+                    ))
+                    
+                    fig.update_layout(
+                        title="Volatility Clustering Intensity by Time Scale",
+                        xaxis_title="Time Window (Days)",
+                        yaxis_title="Clustering Ratio",
+                        template='plotly_dark',
+                        height=300
+                    )
+                    
+                    st.plotly_chart(fig, use_container_width=True)
+            
+            # Volatility persistence
+            persistence = individual_analysis.get('volatility_persistence', {})
+            if persistence and not persistence.get('error'):
+                st.markdown("#### ⏱️ Volatility Persistence Analysis")
+                
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    half_life = persistence.get('volatility_half_life')
+                    if half_life and half_life > 0:
+                        st.metric(
+                            "Volatility Half-Life",
+                            f"{half_life:.1f} days"
+                        )
+                
+                with col2:
+                    persistence_measure = persistence.get('persistence_measure', 0)
+                    st.metric(
+                        "Persistence Index",
+                        f"{persistence_measure:.3f}",
+                        delta="High" if persistence_measure > 0.5 else "Moderate"
+                    )
+                
+                with col3:
+                    autocorrs = persistence.get('autocorrelations', {})
+                    lag1_autocorr = autocorrs.get('lag_1', 0)
+                    st.metric(
+                        "1-Day Autocorrelation",
+                        f"{lag1_autocorr:.3f}"
+                    )
+        
+        # Volatility states analysis
+        if volatility_states and volatility_states.get('states'):
+            st.markdown("#### 🎯 Volatility State Classification")
+            
+            state_chars = volatility_states.get('state_characteristics', {})
+            
+            for state_name, characteristics in state_chars.items():
+                if not characteristics.get('error'):
+                    frequency = characteristics.get('frequency', 0) * 100
+                    description = characteristics.get('description', 'Unknown')
+                    
+                    st.markdown(f"""
+                    <div style="padding: 10px; background: rgba(255,255,255,0.05); border-left: 4px solid #cyan; margin: 5px 0;">
+                        <strong>{description}:</strong> {frequency:.1f}% of time<br>
+                        <strong>Avg Volatility:</strong> {characteristics.get('mean_volatility', 0)*100:.1f}%
+                    </div>
+                    """, unsafe_allow_html=True)
+    
+    def _display_regime_pricing_analysis(self, regime_pricing, ticker):
+        """Display regime-dependent option pricing analysis"""
+        
+        st.markdown("### 💰 Regime-Dependent Option Pricing")
+        
+        calibration = regime_pricing.get('calibration', {})
+        example_option = regime_pricing.get('example_option', {})
+        
+        if calibration.get('success'):
+            st.markdown("#### 🎯 Model Calibration Results")
+            
+            regime_params = calibration.get('regime_parameters', {})
+            current_probs = calibration.get('current_regime_probs', [])
+            
+            if regime_params:
+                col1, col2 = st.columns(2)
+                
+                for i, (regime_key, params) in enumerate(regime_params.items()):
+                    with col1 if i == 0 else col2:
+                        regime_name = f"Regime {i+1}" 
+                        volatility = params.get('volatility', 0) * 100
+                        mean_return = params.get('mean_return', 0) * 100
+                        persistence = params.get('persistence', 0) * 100
+                        
+                        current_prob = current_probs[i]*100 if i < len(current_probs) else 0
+                        
+                        st.markdown(f"""
+                        <div style="padding: 15px; background: rgba(0,255,255,0.1); 
+                                    border: 1px solid #00ffff; border-radius: 8px; margin-bottom: 10px;">
+                            <h4 style="color: #00ffff; margin: 0;">{regime_name}</h4>
+                            <div style="color: #ffffff; font-size: 12px; margin-top: 10px;">
+                                <strong>Volatility:</strong> {volatility:.1f}%<br>
+                                <strong>Expected Return:</strong> {mean_return:.1f}%<br>
+                                <strong>Persistence:</strong> {persistence:.1f}%<br>
+                                <strong>Current Probability:</strong> {current_prob:.1f}%
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+        
+        # Example option pricing
+        if example_option and example_option.get('pricing_results'):
+            st.markdown("#### 📈 Example Option Pricing (3M ATM Call)")
+            
+            pricing_results = example_option['pricing_results']
+            current_price = example_option.get('current_price', 0)
+            strike_price = example_option.get('strike_price', 0)
+            
+            if pricing_results.get('price'):
+                col1, col2, col3, col4 = st.columns(4)
+                
+                with col1:
+                    st.metric(
+                        "Current Stock Price",
+                        f"${current_price:.2f}"
+                    )
+                
+                with col2:
+                    st.metric(
+                        "Strike Price", 
+                        f"${strike_price:.2f}"
+                    )
+                
+                with col3:
+                    option_price = pricing_results.get('price', 0)
+                    st.metric(
+                        "Regime-Adjusted Price",
+                        f"${option_price:.2f}"
+                    )
+                
+                with col4:
+                    greeks = pricing_results.get('greeks', {})
+                    delta = greeks.get('delta', 0)
+                    st.metric(
+                        "Delta",
+                        f"{delta:.3f}"
+                    )
+                
+                # Display regime-specific prices
+                regime_details = pricing_results.get('regime_details', {})
+                if regime_details:
+                    st.markdown("##### Regime-Specific Pricing:")
+                    
+                    regime_data = []
+                    for regime_key, details in regime_details.items():
+                        regime_name = regime_key.replace('regime_', 'Regime ')
+                        regime_data.append({
+                            'Regime': regime_name,
+                            'Price': f"${details.get('price', 0):.2f}",
+                            'Volatility': f"{details.get('volatility', 0)*100:.1f}%",
+                            'Weight': f"{details.get('weight', 0)*100:.1f}%"
+                        })
+                    
+                    regime_df = pd.DataFrame(regime_data)
+                    st.dataframe(regime_df, use_container_width=True)
 
     def run(self):
         """Main application runner"""
