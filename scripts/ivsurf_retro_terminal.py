@@ -30,9 +30,13 @@ try:
     from models.garch import GARCHModel, VolatilityBreakpointDetection
     from models.volatility_clustering import VolatilityClusteringAnalyzer
     from models.regime_pricing import RegimeDependentPricer
+    from portfolio.regime_backtesting import RegimeAwareBacktester
+    from ui.advanced_visualizations import AdvancedVisualizationEngine
     RISK_MODULES_AVAILABLE = True
     REGIME_MODELS_AVAILABLE = True
     CLUSTERING_ANALYSIS_AVAILABLE = True
+    BACKTESTING_AVAILABLE = True
+    ADVANCED_UI_AVAILABLE = True
 except ImportError:
     # Fallback if modules not available
     VaRAnalyzer = None
@@ -42,9 +46,13 @@ except ImportError:
     VolatilityBreakpointDetection = None
     VolatilityClusteringAnalyzer = None
     RegimeDependentPricer = None
+    RegimeAwareBacktester = None
+    AdvancedVisualizationEngine = None
     RISK_MODULES_AVAILABLE = False
     REGIME_MODELS_AVAILABLE = False
     CLUSTERING_ANALYSIS_AVAILABLE = False
+    BACKTESTING_AVAILABLE = False
+    ADVANCED_UI_AVAILABLE = False
 import sys
 import os
 from datetime import datetime, timedelta
@@ -90,6 +98,17 @@ class RetroTerminal:
         
         # Initialize Jump Models Engine
         self.jump_engine = create_jump_engine()
+        
+        # Initialize advanced modules
+        if BACKTESTING_AVAILABLE:
+            self.backtester = RegimeAwareBacktester()
+        else:
+            self.backtester = None
+            
+        if ADVANCED_UI_AVAILABLE:
+            self.viz_engine = AdvancedVisualizationEngine()
+        else:
+            self.viz_engine = None
         self.merton_model = None
         self.kou_model = None
         
@@ -3258,6 +3277,31 @@ class RetroTerminal:
             
             st.plotly_chart(fig, use_container_width=True)
         
+        # Advanced 3D Visualizations (if available)
+        if self.viz_engine and ADVANCED_UI_AVAILABLE:
+            st.markdown("### 🌐 Advanced 3D Regime Analysis")
+            
+            # 3D Regime Probability Surface
+            regime_surface = self.viz_engine.create_regime_probability_surface(
+                results['regime_analysis'], results['dates'], results['ticker']
+            )
+            st.plotly_chart(regime_surface, use_container_width=True)
+            
+            # 3D Volatility Clustering
+            clustering_results = results.get('clustering_analysis')
+            if clustering_results and not clustering_results.get('error'):
+                clustering_3d = self.viz_engine.create_volatility_clustering_3d(
+                    clustering_results, results['ticker']
+                )
+                st.plotly_chart(clustering_3d, use_container_width=True)
+            
+            # Regime Transition Network
+            if results['regime_analysis'].get('regime_statistics'):
+                transition_network = self.viz_engine.create_regime_transition_network(
+                    results['regime_analysis']
+                )
+                st.plotly_chart(transition_network, use_container_width=True)
+        
         # Advanced Volatility Clustering Analysis
         clustering_results = results.get('clustering_analysis')
         if clustering_results and not clustering_results.get('error'):
@@ -3484,19 +3528,488 @@ class RetroTerminal:
                     regime_df = pd.DataFrame(regime_data)
                     st.dataframe(regime_df, use_container_width=True)
 
+    def display_portfolio_backtest_dashboard(self):
+        """
+        Display comprehensive portfolio backtesting and optimization dashboard
+        """
+        st.markdown("""
+        <div class="terminal-box">
+            <div class="terminal-prompt">
+                <span class="glow-purple">█</span> REGIME-AWARE PORTFOLIO BACKTEST <span class="glow-purple">█</span>
+            </div>
+            <div style="color: #9966ff; font-size: 13px; margin-top: 8px;">
+                ADVANCED BACKTESTING & PORTFOLIO OPTIMIZATION
+            </div>
+            <div style="color: #ccaaff; font-size: 11px; margin-top: 5px; font-style: italic;">
+                Multi-Asset Portfolios | Regime-Dependent Allocation | Stress Testing
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        if not BACKTESTING_AVAILABLE:
+            st.error("❌ Backtesting modules not available. Please check installation.")
+            return
+        
+        # Portfolio Configuration
+        st.markdown("### 📊 Portfolio Configuration")
+        
+        col1, col2, col3 = st.columns([2, 1, 1])
+        
+        with col1:
+            # Multi-select for portfolio assets
+            portfolio_assets = st.multiselect(
+                "Select Portfolio Assets:",
+                options=["AAPL", "MSFT", "GOOGL", "TSLA", "NVDA", "SPY", "QQQ", "AMZN", "META", "NFLX", "GLD", "TLT"],
+                default=["AAPL", "MSFT", "GOOGL", "SPY"],
+                help="Choose 2-8 assets for portfolio construction"
+            )
+        
+        with col2:
+            backtest_period = st.selectbox(
+                "Backtest Period:",
+                options=["1y", "2y", "3y", "5y"],
+                index=1,
+                help="Historical period for backtesting"
+            )
+        
+        with col3:
+            initial_capital = st.number_input(
+                "Initial Capital ($):",
+                min_value=10000,
+                max_value=10000000,
+                value=100000,
+                step=10000
+            )
+        
+        # Strategy Configuration
+        st.markdown("### ⚙️ Strategy Configuration")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            rebalance_freq = st.selectbox(
+                "Rebalancing:",
+                options=["daily", "weekly", "monthly"],
+                index=1
+            )
+        
+        with col2:
+            risk_target = st.slider(
+                "Risk Target (Ann. Vol %):",
+                min_value=5.0,
+                max_value=30.0,
+                value=15.0,
+                step=1.0
+            ) / 100
+        
+        with col3:
+            regime_confidence = st.slider(
+                "Regime Confidence Threshold:",
+                min_value=0.5,
+                max_value=0.95,
+                value=0.7,
+                step=0.05
+            )
+        
+        with col4:
+            max_weight = st.slider(
+                "Max Asset Weight (%):",
+                min_value=10,
+                max_value=50,
+                value=40,
+                step=5
+            ) / 100
+        
+        # Run Backtest Button
+        if st.button("🚀 RUN PORTFOLIO BACKTEST", type="primary"):
+            if len(portfolio_assets) < 2:
+                st.error("❌ Please select at least 2 assets for portfolio construction")
+                return
+            
+            with st.spinner('🔄 Running comprehensive portfolio backtest...'):
+                backtest_results = self.run_portfolio_backtest(
+                    portfolio_assets, backtest_period, initial_capital,
+                    rebalance_freq, risk_target, regime_confidence, max_weight
+                )
+            
+            if 'error' in backtest_results:
+                st.error(f"❌ {backtest_results['error']}")
+                return
+            
+            # Display results
+            self._display_backtest_results(backtest_results)
+            
+        # Portfolio Optimization Section
+        st.markdown("### 🎯 Real-Time Portfolio Optimization")
+        
+        if len(portfolio_assets) >= 2:
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                if st.button("⚡ OPTIMIZE CURRENT PORTFOLIO", type="secondary"):
+                    with st.spinner('🧮 Optimizing portfolio weights...'):
+                        optimization_results = self.optimize_current_portfolio(portfolio_assets)
+                    
+                    if optimization_results.get('success'):
+                        self._display_optimization_results(optimization_results, portfolio_assets)
+                    else:
+                        st.error(f"❌ Optimization failed: {optimization_results.get('error', 'Unknown error')}")
+            
+            with col2:
+                if st.button("🔬 RUN STRESS TESTS", type="secondary"):
+                    with st.spinner('🚨 Running portfolio stress tests...'):
+                        stress_results = self.run_portfolio_stress_tests(portfolio_assets)
+                    
+                    if not stress_results.get('error'):
+                        self._display_stress_test_results(stress_results)
+                    else:
+                        st.error(f"❌ Stress testing failed: {stress_results.get('error', 'Unknown error')}")
+    
+    def run_portfolio_backtest(self, assets, period, initial_capital, rebalance_freq, 
+                              risk_target, regime_confidence, max_weight):
+        """Run comprehensive portfolio backtest"""
+        
+        if not BACKTESTING_AVAILABLE:
+            return {'error': 'Backtesting modules not available'}
+        
+        try:
+            # Download price data for all assets
+            price_data = {}
+            
+            for asset in assets:
+                data = yf.download(asset, period=period, progress=False)
+                if not data.empty:
+                    price_data[asset] = data['Close']
+            
+            if len(price_data) < 2:
+                return {'error': 'Insufficient price data for selected assets'}
+            
+            # Create regime model (simplified)
+            # In practice, this would use the actual fitted regime model
+            regime_model = {
+                'n_regimes': 2,
+                'parameters': {
+                    'regime_0': {'volatility': 0.12, 'mean_return': 0.08},
+                    'regime_1': {'volatility': 0.25, 'mean_return': 0.02}
+                }
+            }
+            
+            # Strategy configuration
+            strategy_config = {
+                'initial_capital': initial_capital,
+                'rebalance_frequency': rebalance_freq,
+                'risk_target': risk_target,
+                'regime_confidence': regime_confidence,
+                'max_weight': max_weight
+            }
+            
+            # Run backtest
+            backtest_results = self.backtester.backtest_regime_strategy(
+                price_data, regime_model, strategy_config
+            )
+            
+            return backtest_results
+            
+        except Exception as e:
+            return {'error': f'Backtesting failed: {str(e)}'}
+    
+    def optimize_current_portfolio(self, assets):
+        """Optimize portfolio weights using current market data"""
+        
+        if not BACKTESTING_AVAILABLE:
+            return {'success': False, 'error': 'Backtesting modules not available'}
+        
+        try:
+            # Get recent data for expected returns and covariance estimation
+            price_data = {}
+            
+            for asset in assets:
+                data = yf.download(asset, period="1y", progress=False)
+                if not data.empty:
+                    price_data[asset] = data['Close']
+            
+            if len(price_data) < 2:
+                return {'success': False, 'error': 'Insufficient price data'}
+            
+            # Calculate returns and statistics
+            returns_df = pd.DataFrame(price_data).pct_change().dropna()
+            
+            # Expected returns (simple historical mean)
+            expected_returns = returns_df.mean() * 252  # Annualized
+            
+            # Covariance matrix
+            covariance_matrix = returns_df.cov() * 252  # Annualized
+            
+            # Current regime probabilities (simplified estimation)
+            recent_vol = returns_df.tail(20).std().mean()
+            overall_vol = returns_df.std().mean()
+            
+            if recent_vol > overall_vol * 1.2:
+                regime_probs = [0.3, 0.7]  # High vol regime more likely
+            else:
+                regime_probs = [0.7, 0.3]  # Low vol regime more likely
+            
+            # Run optimization
+            optimization_results = self.backtester.optimize_regime_portfolio(
+                expected_returns.values,
+                covariance_matrix.values,
+                regime_probs
+            )
+            
+            if optimization_results.get('success'):
+                # Map weights back to asset names
+                optimal_weights = optimization_results['optimal_weights']
+                weight_dict = {asset: optimal_weights[i] for i, asset in enumerate(assets)}
+                optimization_results['weight_allocation'] = weight_dict
+            
+            return optimization_results
+            
+        except Exception as e:
+            return {'success': False, 'error': f'Optimization failed: {str(e)}'}
+    
+    def run_portfolio_stress_tests(self, assets):
+        """Run comprehensive stress tests on portfolio"""
+        
+        if not BACKTESTING_AVAILABLE:
+            return {'error': 'Backtesting modules not available'}
+        
+        try:
+            # Equal weights for stress testing
+            equal_weights = {asset: 1.0 / len(assets) for asset in assets}
+            
+            # Get historical data
+            price_data = {}
+            for asset in assets:
+                data = yf.download(asset, period="2y", progress=False)
+                if not data.empty:
+                    price_data[asset] = data['Close']
+            
+            # Define stress scenarios
+            stress_scenarios = {
+                'market_crash': {
+                    'type': 'market_crash',
+                    'magnitude': 0.20  # 20% crash
+                },
+                'volatility_spike': {
+                    'type': 'volatility_spike',
+                    'magnitude': 2.0  # 2x volatility
+                },
+                'correlation_breakdown': {
+                    'type': 'shock',
+                    'magnitude': 0.15  # 15% shock
+                }
+            }
+            
+            # Run stress tests
+            stress_results = self.backtester.stress_test_portfolio(
+                equal_weights, price_data, stress_scenarios
+            )
+            
+            return stress_results
+            
+        except Exception as e:
+            return {'error': f'Stress testing failed: {str(e)}'}
+    
+    def _display_backtest_results(self, results):
+        """Display comprehensive backtest results"""
+        
+        portfolio_history = results.get('portfolio_history')
+        performance_metrics = results.get('performance_metrics', {})
+        regime_analysis = results.get('regime_analysis', {})
+        
+        # Performance Summary
+        st.markdown("### 📈 Performance Summary")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            total_return = performance_metrics.get('total_return', 0) * 100
+            st.metric(
+                "Total Return",
+                f"{total_return:.2f}%",
+                delta="vs Benchmark" if total_return > 0 else None
+            )
+        
+        with col2:
+            annual_return = performance_metrics.get('annual_return', 0) * 100
+            st.metric(
+                "Annual Return",
+                f"{annual_return:.2f}%"
+            )
+        
+        with col3:
+            sharpe_ratio = performance_metrics.get('sharpe_ratio', 0)
+            st.metric(
+                "Sharpe Ratio",
+                f"{sharpe_ratio:.2f}",
+                delta="Excellent" if sharpe_ratio > 1.5 else "Good" if sharpe_ratio > 1.0 else "Fair"
+            )
+        
+        with col4:
+            max_drawdown = performance_metrics.get('max_drawdown', 0) * 100
+            st.metric(
+                "Max Drawdown",
+                f"{max_drawdown:.2f}%",
+                delta="Low Risk" if abs(max_drawdown) < 10 else "Moderate Risk" if abs(max_drawdown) < 20 else "High Risk"
+            )
+        
+        # Portfolio Performance Chart
+        if portfolio_history is not None and not portfolio_history.empty and self.viz_engine:
+            st.markdown("### 📊 Portfolio Performance vs Benchmark")
+            
+            performance_chart = self.viz_engine.create_performance_comparison_chart(results)
+            st.plotly_chart(performance_chart, use_container_width=True)
+        
+        # Risk Metrics
+        st.markdown("### ⚠️ Risk Analysis")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            annual_vol = performance_metrics.get('annual_volatility', 0) * 100
+            st.metric(
+                "Annual Volatility",
+                f"{annual_vol:.2f}%"
+            )
+        
+        with col2:
+            var_95 = performance_metrics.get('var_95', 0) * 100
+            st.metric(
+                "Daily VaR (95%)",
+                f"{var_95:.2f}%"
+            )
+        
+        with col3:
+            win_rate = performance_metrics.get('win_rate', 0) * 100
+            st.metric(
+                "Win Rate",
+                f"{win_rate:.1f}%"
+            )
+        
+        # Regime-Specific Performance
+        if regime_analysis:
+            st.markdown("### 🎯 Regime-Specific Performance")
+            
+            for regime_key, regime_data in regime_analysis.items():
+                if not regime_data.get('error'):
+                    regime_name = regime_key.replace('regime_', 'Regime ').title()
+                    avg_return = regime_data.get('avg_return', 0) * 252 * 100  # Annualized
+                    frequency = regime_data.get('frequency', 0) * 100
+                    sharpe = regime_data.get('sharpe', 0)
+                    
+                    st.markdown(f"""
+                    <div style="padding: 15px; background: rgba(150,100,255,0.1); 
+                                border: 1px solid #9966ff; border-radius: 8px; margin-bottom: 10px;">
+                        <h4 style="color: #9966ff; margin: 0;">{regime_name}</h4>
+                        <div style="color: #ffffff; font-size: 12px; margin-top: 10px;">
+                            <strong>Frequency:</strong> {frequency:.1f}% of time<br>
+                            <strong>Avg Annual Return:</strong> {avg_return:.1f}%<br>
+                            <strong>Sharpe Ratio:</strong> {sharpe:.2f}
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+    
+    def _display_optimization_results(self, results, assets):
+        """Display portfolio optimization results"""
+        
+        st.markdown("### ⚡ Optimization Results")
+        
+        # Expected performance metrics
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            expected_return = results.get('expected_return', 0) * 100
+            st.metric(
+                "Expected Annual Return",
+                f"{expected_return:.2f}%"
+            )
+        
+        with col2:
+            expected_vol = results.get('expected_volatility', 0) * 100
+            st.metric(
+                "Expected Volatility",
+                f"{expected_vol:.2f}%"
+            )
+        
+        with col3:
+            sharpe_ratio = results.get('sharpe_ratio', 0)
+            st.metric(
+                "Expected Sharpe Ratio",
+                f"{sharpe_ratio:.2f}"
+            )
+        
+        # Optimal weights
+        weight_allocation = results.get('weight_allocation', {})
+        
+        if weight_allocation:
+            st.markdown("### 💼 Optimal Portfolio Allocation")
+            
+            # Create DataFrame for display
+            allocation_data = []
+            for asset, weight in weight_allocation.items():
+                allocation_data.append({
+                    'Asset': asset,
+                    'Weight': f"{weight*100:.1f}%",
+                    'Weight_Value': weight
+                })
+            
+            allocation_df = pd.DataFrame(allocation_data)
+            
+            # Display as table
+            st.dataframe(allocation_df[['Asset', 'Weight']], use_container_width=True)
+            
+            # Display as pie chart
+            if len(allocation_data) > 0:
+                fig = go.Figure(data=[go.Pie(
+                    labels=[d['Asset'] for d in allocation_data],
+                    values=[d['Weight_Value'] for d in allocation_data],
+                    hole=0.3
+                )])
+                
+                fig.update_layout(
+                    title="Optimal Portfolio Allocation",
+                    template='plotly_dark',
+                    height=400
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
+    
+    def _display_stress_test_results(self, results):
+        """Display stress test results"""
+        
+        st.markdown("### 🚨 Stress Test Results")
+        
+        if self.viz_engine and not results.get('error'):
+            # Create stress test dashboard
+            stress_dashboard = self.viz_engine.create_stress_test_dashboard(results)
+            st.plotly_chart(stress_dashboard, use_container_width=True)
+        
+        # Risk recommendations
+        recommendations = results.get('recommendations', [])
+        if recommendations:
+            st.markdown("### 💡 Risk Management Recommendations")
+            
+            for i, recommendation in enumerate(recommendations, 1):
+                st.markdown(f"""
+                <div style="padding: 10px; background: rgba(255,165,0,0.1); border-left: 4px solid orange; margin: 5px 0;">
+                    <strong>{i}.</strong> {recommendation}
+                </div>
+                """, unsafe_allow_html=True)
+
     def run(self):
         """Main application runner"""
         self.set_page_config()
         self.render_header()
         
         # Enhanced Navigation with new advanced features
-        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
             "MARKET SCANNER", 
             "INDIVIDUAL ANALYSIS", 
             "VOLATILITY SURFACE", 
             "ML FORECASTING",
             "RISK MANAGEMENT",
             "REGIME ANALYSIS",
+            "PORTFOLIO BACKTEST",
             "MONTE CARLO SIM",
             "SYSTEM STATUS"
         ])
@@ -3526,9 +4039,15 @@ class RetroTerminal:
                 st.error("❌ Regime analysis modules not available. Please check installation.")
         
         with tab7:
-            self.display_monte_carlo_simulation()
+            if BACKTESTING_AVAILABLE:
+                self.display_portfolio_backtest_dashboard()
+            else:
+                st.error("❌ Backtesting modules not available. Please check installation.")
         
         with tab8:
+            self.display_monte_carlo_simulation()
+        
+        with tab9:
             self.display_system_status()
 
     def display_volatility_surface(self):
