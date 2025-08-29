@@ -849,455 +849,89 @@ class RetroTerminal:
     def calculate_tomorrow_gain_prediction(self, hist, current_price, volatility, rsi, macd, bb_position, 
                                           volume_trend, momentum_1d, momentum_3d, momentum_5d):
         """
-        ENHANCED QUANTUM PREDICTION ENGINE v2.0
-        Ultra-sophisticated mathematical modeling for tomorrow's gain prediction
-        Advanced technical indicators with multi-dimensional momentum analysis
+        SIMPLIFIED SWING TRADING PREDICTION v3.0
+        Evidence-based prediction system focused on proven swing trading patterns
+        Removes overfitting and focuses on statistically significant signals
         """
         
-        from scipy.stats import norm, skew, kurtosis
-        from scipy.signal import find_peaks
+        # Initialize base score
+        prediction_score = 0
         
-        # === ADVANCED TECHNICAL INDICATORS FOUNDATION ===
+        # === CORE SWING TRADING SIGNALS ===
         
-        # 1. ENHANCED MOMENTUM ANALYSIS WITH MULTI-TIMEFRAME CONVERGENCE
-        momentum_convergence_score = 0
-        momentum_weights = [0.5, 0.3, 0.2]  # Weight recent momentum more heavily
-        weighted_momentum = (momentum_1d * momentum_weights[0] + 
-                           momentum_3d * momentum_weights[1] + 
-                           momentum_5d * momentum_weights[2])
+        # 1. MOMENTUM CONVERGENCE (30% weight)
+        momentum_score = 0
+        if momentum_1d > 0 and momentum_3d > 0:  # Both positive
+            momentum_score = min(30, momentum_1d * 10)
+            if momentum_1d > momentum_3d:  # Accelerating
+                momentum_score *= 1.3
         
-        # Momentum acceleration detection
-        momentum_accel = (momentum_1d - momentum_3d) / 3 if momentum_3d != 0 else 0
-        momentum_jerk = (momentum_accel - ((momentum_3d - momentum_5d) / 2)) if momentum_5d != 0 else 0
+        # 2. RSI OVERSOLD BOUNCE (25% weight) 
+        rsi_score = 0
+        if rsi < 30:  # Oversold
+            rsi_score = (30 - rsi) * 2
+            if rsi < 20:  # Extremely oversold
+                rsi_score *= 1.5
         
-        if weighted_momentum > 2 and momentum_accel > 0.5:
-            momentum_convergence_score = 35 + (momentum_jerk * 10)
-        elif weighted_momentum > 1 and momentum_accel > 0:
-            momentum_convergence_score = 20 + (momentum_jerk * 5)
-        
-        # 2. ADVANCED RSI DIVERGENCE ANALYSIS
-        rsi_divergence_score = 0
-        if len(hist) >= 20:
-            prices = hist['Close'].tail(20).values
-            # Calculate RSI for multiple periods
-            rsi_values = []
-            for i in range(14, len(prices)):
-                gains = []
-                losses = []
-                for j in range(i-14, i):
-                    change = prices[j+1] - prices[j]
-                    if change > 0:
-                        gains.append(change)
-                        losses.append(0)
-                    else:
-                        gains.append(0)
-                        losses.append(abs(change))
-                
-                avg_gain = np.mean(gains)
-                avg_loss = np.mean(losses)
-                rs = avg_gain / avg_loss if avg_loss != 0 else 100
-                rsi_val = 100 - (100 / (1 + rs))
-                rsi_values.append(rsi_val)
-            
-            if len(rsi_values) >= 5:
-                # Detect bullish divergence
-                price_trend = np.polyfit(range(len(prices[-5:])), prices[-5:], 1)[0]
-                rsi_trend = np.polyfit(range(len(rsi_values[-5:])), rsi_values[-5:], 1)[0]
-                
-                if price_trend < 0 and rsi_trend > 0 and rsi < 35:  # Bullish divergence
-                    rsi_divergence_score = 40
-                elif rsi < 25 and rsi_trend > 0:  # Extreme oversold with momentum
-                    rsi_divergence_score = 50
-        
-        # 3. SOPHISTICATED VOLUME ANALYSIS
-        volume_sophistication_score = 0
-        if len(hist) >= 30:
-            volumes = hist['Volume'].tail(30).values
-            prices = hist['Close'].tail(30).values
-            
-            # Volume-Price Trend (VPT) analysis
-            vpt = []
-            vpt_val = 0
-            for i in range(1, len(prices)):
-                vpt_val += volumes[i] * ((prices[i] - prices[i-1]) / prices[i-1])
-                vpt.append(vpt_val)
-            
-            # On-Balance Volume (OBV) momentum
-            obv = []
-            obv_val = volumes[0]
-            for i in range(1, len(prices)):
-                if prices[i] > prices[i-1]:
-                    obv_val += volumes[i]
-                elif prices[i] < prices[i-1]:
-                    obv_val -= volumes[i]
-                obv.append(obv_val)
-            
-            # Volume breakout detection
-            avg_volume = np.mean(volumes[-20:])
-            recent_volume = np.mean(volumes[-3:])
-            volume_surge = recent_volume / avg_volume if avg_volume > 0 else 1
-            
-            if volume_surge > 2.5 and len(obv) > 5 and obv[-1] > obv[-5]:
-                volume_sophistication_score = 45
-            elif volume_surge > 1.8 and len(vpt) > 5 and vpt[-1] > vpt[-5]:
-                volume_sophistication_score = 30
-        
-        # === ENHANCED BULLISH MOMENTUM INDICATORS ===
-        
-        # 1. ADVANCED Oversold Bounce Potential (Mean Reversion with Statistical Edge)
-        oversold_score = 0
-        if rsi < 35:  # Oversold conditions
-            # Statistical mean reversion probability
-            std_multiplier = (35 - rsi) / 10  # Standard deviation multiplier
-            oversold_score = (35 - rsi) * 6 * std_multiplier  # Enhanced aggressive scoring
-            
-            if bb_position < 0.15:  # Near lower Bollinger Band
-                # Calculate Bollinger Band squeeze
-                bb_squeeze_factor = (0.15 - bb_position) * 10
-                oversold_score *= (2.0 + bb_squeeze_factor)  # Dynamic boost
-            
-            if rsi < 25:  # Extremely oversold with higher probability
-                statistical_edge = (25 - rsi) / 5  # Statistical edge factor
-                oversold_score *= (1.5 + statistical_edge)  # Progressive boost
-        
-        # 2. QUANTUM Momentum Acceleration (Multi-dimensional Trend Analysis)
-        momentum_acceleration = momentum_convergence_score  # Use our enhanced score
-        if momentum_1d > 0 and momentum_3d > momentum_1d:  # Accelerating upward
-            acceleration_factor = (momentum_1d - momentum_3d) / momentum_3d if momentum_3d != 0 else 1
-            momentum_acceleration += momentum_3d * 20 * (1 + acceleration_factor)
-            
-            if volume_trend > 1.5:  # Backed by volume with exponential scaling
-                volume_multiplier = min(3.0, volume_trend)  # Cap the multiplier
-                momentum_acceleration *= volume_multiplier
-        elif momentum_1d > 2 and momentum_3d > 0:  # Strong recent momentum
-            momentum_acceleration += momentum_1d * 25  # Increased from 20
-        
-        # 3. ENHANCED High Volatility Opportunity with Risk-Adjusted Returns
-        volatility_boost = 0
-        if volatility > 0.4:  # High volatility = high potential gains
-            # Risk-adjusted volatility scoring
-            vol_efficiency = min(2.0, volatility / 0.3)  # Efficiency ratio
-            volatility_boost = volatility * 65 * vol_efficiency  # Enhanced from 50
-        elif volatility > 0.6:  # Extreme volatility with exponential scaling
-            extreme_vol_factor = min(3.0, volatility / 0.4)
-            volatility_boost = volatility * 120 * extreme_vol_factor  # Enhanced from 80
-        
-        # 4. Small/Mid-Cap Growth Boost
-        # Smaller stocks tend to have higher % moves
-        small_cap_boost = 0
-        try:
-            if len(hist) > 10:
-                avg_volume = hist['Volume'].tail(20).mean()
-                if avg_volume < 5000000:  # Lower volume = smaller cap
-                    small_cap_boost = 15
-                elif avg_volume < 2000000:  # Very small cap
-                    small_cap_boost = 25
-        except:
-            pass
-        
-        # 3. Breakout Probability (Technical Analysis)
-        breakout_score = 0
-        if len(hist) >= 20:
-            # Near resistance with momentum
-            recent_high = hist['High'].tail(20).max()
-            if current_price > recent_high * 0.98 and momentum_1d > 1:
-                breakout_score = 25
-            
-            # Consolidation breakout
-            price_range = hist['High'].tail(10).max() - hist['Low'].tail(10).min()
-            consolidation_ratio = price_range / current_price
-            if consolidation_ratio < 0.03 and volume_trend > 1.3:  # Tight range + volume
-                breakout_score += 20
-        
-        # 4. Volume Surge Prediction (Smart Money)
+        # 3. VOLUME CONFIRMATION (20% weight)
         volume_score = 0
-        if volume_trend > 2.0:  # Exceptional volume
-            volume_score = 30
-        elif volume_trend > 1.5:  # High volume
-            volume_score = 15
+        if volume_trend > 1.5:  # Above average volume
+            volume_score = min(20, (volume_trend - 1) * 20)
+            if len(hist) >= 10:
+                # Check if price and volume move together
+                recent_prices = hist['Close'].tail(5).pct_change().dropna()
+                recent_volumes = hist['Volume'].tail(5).pct_change().dropna()
+                if len(recent_prices) > 0 and len(recent_volumes) > 0:
+                    price_vol_corr = np.corrcoef(recent_prices, recent_volumes)[0,1]
+                    if not np.isnan(price_vol_corr) and price_vol_corr > 0.3:
+                        volume_score *= 1.2
         
-        # Add volume pattern analysis
-        if len(hist) >= 5:
-            recent_volume = hist['Volume'].tail(3).mean()
-            previous_volume = hist['Volume'].tail(10).head(7).mean()
-            volume_increase = recent_volume / previous_volume if previous_volume > 0 else 1
-            if volume_increase > 1.5:
-                volume_score += 15
+        # 4. VOLATILITY OPPORTUNITY (15% weight)
+        vol_score = 0
+        if 0.2 < volatility < 0.6:  # Sweet spot for swing trading
+            vol_score = 15
+        elif volatility > 0.6:  # High vol but risky
+            vol_score = 10
         
-        # 5. MACD Signal Strength
+        # 5. MACD SIGNAL (10% weight)
         macd_score = 0
         if macd > 0:  # Bullish MACD
-            macd_score = min(20, abs(macd) * 2000)
-            if momentum_1d > 0:  # Confirmed by price momentum
-                macd_score *= 1.3
+            macd_score = min(10, abs(macd) * 1000)
         
-        # 6. Options Activity Indicator (Implied Movement)
-        options_activity_score = 0
-        if volatility > 0.3:  # High IV suggests expected movement
-            options_activity_score = volatility * 25
-            if momentum_1d > 0:  # Bullish direction
-                options_activity_score *= 1.2
+        # === RISK FILTERS ===
         
-        # 7. Sector Rotation Signal
-        sector_score = 5  # Base score (placeholder for sector strength)
+        # Overbought filter
+        if rsi > 70:
+            prediction_score *= 0.5
         
-        # 8. Earnings/Event Proximity Boost
-        event_score = 0
-        if volatility > 0.4:  # Often precedes earnings
-            event_score = 10
-            if rsi < 40:  # Oversold before event
-                event_score += 10
-        
-        # 9. Gap Probability (Pre-market Movement)
-        gap_score = 0
-        if len(hist) >= 10:
-            # Calculate historical gap frequency and size
-            gaps = []
-            for i in range(1, min(10, len(hist))):
-                if i < len(hist):
-                    gap = (hist['Open'].iloc[-i] - hist['Close'].iloc[-i-1]) / hist['Close'].iloc[-i-1]
-                    gaps.append(gap)
-            
-            if gaps:
-                avg_gap = np.mean([abs(g) for g in gaps])
-                positive_gaps = sum(1 for g in gaps if g > 0.01)  # 1%+ gaps
-                
-                if avg_gap > 0.01 and positive_gaps >= 3:
-                    gap_score = 15
-        
-        # 10. Technical Pattern Recognition
-        pattern_score = 0
-        if len(hist) >= 15:
-            closes = hist['Close'].tail(15).values
-            
-            # Cup and Handle pattern approximation
-            if len(closes) >= 10:
-                mid_point = len(closes) // 2
-                left_side = closes[:mid_point]
-                right_side = closes[mid_point:]
-                
-                if len(left_side) > 0 and len(right_side) > 0:
-                    left_trend = np.polyfit(range(len(left_side)), left_side, 1)[0]
-                    right_trend = np.polyfit(range(len(right_side)), right_side, 1)[0]
-                    
-                    if left_trend < 0 and right_trend > 0:  # Down then up
-                        pattern_score += 15
-            
-            # Flag pattern (consolidation after strong move)
-            if momentum_5d > 5 and abs(momentum_1d) < 1:  # Strong 5-day, flat recent
-                pattern_score += 10
-        
-        # === COMBINE BULLISH FACTORS ===
-        total_bullish_score = (
-            oversold_score * 0.25 +           # Mean reversion (increased weight)
-            momentum_acceleration * 0.20 +     # Momentum (increased weight)
-            breakout_score * 0.15 +           # Breakouts
-            volume_score * 0.15 +             # Volume
-            volatility_boost * 0.10 +         # Volatility boost (new)
-            small_cap_boost * 0.05 +          # Small cap boost (new)
-            macd_score * 0.05 +               # MACD
-            options_activity_score * 0.03 +   # Options activity
-            event_score * 0.01 +              # Events
-            gap_score * 0.005 +               # Gaps
-            pattern_score * 0.005             # Patterns
-        )
-        
-        # === ADVANCED VOLATILITY MODELING & RISK METRICS ===
-        
-        # 1. GARCH-style Volatility Clustering Analysis
-        volatility_clustering_score = 0
-        if len(hist) >= 30:
-            returns = hist['Close'].pct_change().dropna().tail(30)
-            squared_returns = returns ** 2
-            
-            # Volatility clustering detection
-            vol_autocorr = np.corrcoef(squared_returns[:-1], squared_returns[1:])[0,1]
-            if not np.isnan(vol_autocorr) and vol_autocorr > 0.3:
-                clustering_strength = min(1.0, vol_autocorr)
-                volatility_clustering_score = clustering_strength * 25
-        
-        # 2. ADVANCED Black-Scholes Greeks Analysis for Directional Bias
-        greeks_momentum_score = 0
-        try:
-            # Estimate option deltas for different strikes
-            time_to_expiry = 1/365  # Tomorrow
-            risk_free_rate = 0.05
-            
-            # Calculate theoretical call deltas for various strikes
-            strikes = [current_price * 0.95, current_price, current_price * 1.05]
-            call_deltas = []
-            
-            for strike in strikes:
-                d1 = (np.log(current_price / strike) + (risk_free_rate + 0.5 * volatility**2) * time_to_expiry) / (volatility * np.sqrt(time_to_expiry))
-                delta = norm.cdf(d1)
-                call_deltas.append(delta)
-            
-            # Delta smile analysis - convexity indicates direction
-            if len(call_deltas) == 3:
-                delta_convexity = call_deltas[0] + call_deltas[2] - 2 * call_deltas[1]
-                if delta_convexity > 0 and momentum_1d > 0:  # Positive convexity + momentum
-                    greeks_momentum_score = abs(delta_convexity) * 100
-        except:
-            pass
-        
-        # 3. SOPHISTICATED Risk-Adjusted Return Expectation
-        risk_adjusted_score = 0
-        if len(hist) >= 20:
-            returns = hist['Close'].pct_change().dropna().tail(20)
-            
-            # Sharpe ratio calculation
-            excess_returns = returns - 0.05/252  # Risk-free rate daily
-            sharpe_ratio = excess_returns.mean() / excess_returns.std() if excess_returns.std() > 0 else 0
-            
-            # Sortino ratio (downside deviation)
-            downside_returns = returns[returns < 0]
-            downside_std = downside_returns.std() if len(downside_returns) > 0 else returns.std()
-            sortino_ratio = excess_returns.mean() / downside_std if downside_std > 0 else 0
-            
-            # Calmar ratio approximation
-            max_drawdown = 0
-            peak = hist['Close'].iloc[0]
-            for price in hist['Close']:
-                if price > peak:
-                    peak = price
-                drawdown = (peak - price) / peak
-                max_drawdown = max(max_drawdown, drawdown)
-            
-            calmar_ratio = (returns.mean() * 252) / max_drawdown if max_drawdown > 0 else 0
-            
-            # Combined risk-adjusted score
-            if sharpe_ratio > 0.5 and sortino_ratio > 0.7:
-                risk_adjusted_score = min(30, (sharpe_ratio + sortino_ratio + calmar_ratio) * 10)
-        
-        # 4. HESTON Model Implied Volatility Surface Analysis
-        heston_score = 0
-        try:
-            # Simplified Heston parameter estimation
-            if len(hist) >= 50:
-                returns = hist['Close'].pct_change().dropna()
-                vol_of_vol = returns.rolling(10).std().std()  # Volatility of volatility
-                mean_reversion_speed = abs(returns.autocorr(lag=1))  # Mean reversion proxy
-                
-                # Heston smile prediction
-                if vol_of_vol > 0.01 and mean_reversion_speed > 0.1:
-                    heston_complexity = vol_of_vol * mean_reversion_speed * 1000
-                    if volatility > 0.3:  # High base volatility
-                        heston_score = min(25, heston_complexity)
-        except:
-            pass
-        
-        # 5. JUMP DIFFUSION Detection (Merton Model)
-        jump_detection_score = 0
-        if len(hist) >= 30:
-            returns = hist['Close'].pct_change().dropna()
-            
-            # Detect jumps using statistical methods
-            return_threshold = returns.std() * 3  # 3-sigma events
-            jumps = returns[abs(returns) > return_threshold]
-            
-            if len(jumps) > 0:
-                recent_jumps = returns.tail(5)
-                positive_jumps = sum(1 for r in recent_jumps if r > return_threshold)
-                
-                if positive_jumps >= 1:  # Recent positive jump
-                    jump_intensity = len(jumps) / len(returns)
-                    jump_detection_score = min(20, jump_intensity * 200)
-        
-        # Update total score with advanced volatility metrics
-        volatility_enhancement = (
-            volatility_clustering_score * 0.25 +
-            greeks_momentum_score * 0.30 +
-            risk_adjusted_score * 0.25 +
-            heston_score * 0.15 +
-            jump_detection_score * 0.05
-        )
-        
-        total_bullish_score += volatility_enhancement
-        
-        # === RISK ADJUSTMENT ===
-        # Penalize very high volatility (too risky)
+        # Extreme volatility filter  
         if volatility > 0.8:
-            total_bullish_score *= 0.7
+            prediction_score *= 0.3
         
-        # Boost for optimal volatility range
-        if 0.2 < volatility < 0.5:
-            total_bullish_score *= 1.1
+        # === COMBINE SCORES ===
+        prediction_score = (
+            momentum_score * 0.30 +
+            rsi_score * 0.25 + 
+            volume_score * 0.20 +
+            vol_score * 0.15 +
+            macd_score * 0.10
+        )
         
-        # Penalize overbought conditions
-        if rsi > 75:
-            total_bullish_score *= 0.6
-        
-        # === ULTRA-SOPHISTICATED QUANTITATIVE ALGORITHMS ===
-        
-        # 1. MACHINE LEARNING-INSPIRED Pattern Recognition
-        ml_pattern_score = 0
-        if len(hist) >= 50:
-            # Feature engineering for pattern recognition
-            features = []
-            prices = hist['Close'].tail(50).values
-            volumes = hist['Volume'].tail(50).values
+        # === PATTERN RECOGNITION (Simple) ===
+        pattern_bonus = 0
+        if len(hist) >= 20:
+            # Support bounce pattern
+            recent_low = hist['Low'].tail(10).min()
+            support_level = hist['Low'].tail(20).quantile(0.2)
+            if current_price > recent_low * 1.02 and recent_low <= support_level * 1.01:
+                pattern_bonus = 10
             
-            # Technical features
-            for window in [5, 10, 20]:
-                if len(prices) >= window:
-                    sma = np.mean(prices[-window:])
-                    price_to_sma = current_price / sma
-                    features.append(price_to_sma)
-                    
-                    # Volume-price correlation
-                    if len(volumes) >= window:
-                        vol_price_corr = np.corrcoef(prices[-window:], volumes[-window:])[0,1]
-                        if not np.isnan(vol_price_corr):
-                            features.append(vol_price_corr)
-            
-            # Pattern scoring based on feature combinations
-            if len(features) >= 6:
-                # Bull flag pattern approximation
-                short_trend = features[0]  # Price to 5-day SMA
-                medium_trend = features[1]  # Price to 10-day SMA
-                long_trend = features[2]   # Price to 20-day SMA
-                
-                if short_trend > 1.02 and medium_trend > 1.01 and long_trend > 1.005:
-                    ml_pattern_score = 25
-                elif short_trend > 1.01 and medium_trend > 1.005:
-                    ml_pattern_score = 15
+            # Breakout pattern
+            resistance = hist['High'].tail(20).quantile(0.8)
+            if current_price > resistance * 0.99 and momentum_1d > 0:
+                pattern_bonus = 15
         
-        # 2. FRACTAL ANALYSIS for Multi-Timeframe Confluence
-        fractal_score = 0
-        if len(hist) >= 60:
-            # Analyze multiple timeframes for fractal patterns
-            timeframes = [5, 15, 30]  # Short, medium, long-term
-            fractal_signals = []
-            
-            for tf in timeframes:
-                if len(hist) >= tf:
-                    tf_data = hist.tail(tf)
-                    highs = tf_data['High'].values
-                    lows = tf_data['Low'].values
-                    
-                    # Find local maxima and minima
-                    try:
-                        high_peaks, _ = find_peaks(highs)
-                        low_peaks, _ = find_peaks(-lows)
-                        
-                        # Fractal breakout detection
-                        if len(high_peaks) > 0:
-                            last_high_peak = highs[high_peaks[-1]] if len(high_peaks) > 0 else highs[0]
-                            if current_price > last_high_peak * 1.001:  # Breaking above fractal
-                                fractal_signals.append(1)
-                            else:
-                                fractal_signals.append(0)
-                        else:
-                            fractal_signals.append(0)
-                    except:
-                        fractal_signals.append(0)
-            
-            # Multi-timeframe confluence
-            confluence_strength = sum(fractal_signals) / len(fractal_signals)
-            fractal_score = confluence_strength * 30
-        
-        # 3. KELLY CRITERION for Optimal Position Sizing Signal
-        kelly_score = 0
+        prediction_score += pattern_bonus
         if len(hist) >= 30:
             returns = hist['Close'].pct_change().dropna().tail(30)
             positive_returns = returns[returns > 0]
