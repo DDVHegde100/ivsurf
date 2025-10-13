@@ -9,7 +9,7 @@ Advanced options trading terminal with real-time volatility analysis, swing trad
 *Note: Live deployment link will be updated once the app is deployed*
 [![Deploy](https://img.shields.io/badge/Deploy-Streamlit_Cloud-FF6B6B.svg)](https://share.streamlit.io/)
 
-## 🚀 Live Demo
+## Live Demo
 
 **Try the IVSURF Terminal:** [https://ivsurf-volatility-explorer.streamlit.app](https://ivsurf-volatility-explorer.streamlit.app)
 
