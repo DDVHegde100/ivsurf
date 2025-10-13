@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: ivsurf-terminal
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run scripts/ivsurf_retro_terminal.py --server.port=$PORT --server.address=0.0.0.0
+    plan: free
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.9.20

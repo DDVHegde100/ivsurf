@@ -5,6 +5,13 @@ A quantitative finance platform for options pricing, volatility modeling, and sw
 [![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://www.python.org/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.28+-red.svg)](https://streamlit.io/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Deploy](https://img.shields.io/badge/Deploy-Streamlit_Cloud-FF6B6B.svg)](https://share.streamlit.io/)
+
+## 🚀 Live Demo
+
+**Try the IVSURF Terminal:** [https://ivsurf-volatility-explorer.streamlit.app](https://ivsurf-volatility-explorer.streamlit.app)
+
+*Professional volatility surface modeling and swing trading analysis in your browser*
 
 ## Overview
 
@@ -41,13 +48,30 @@ volatility_surface_explorer/
     └── fetch_data.py        # Market data integration
 ```
 
+## Deployment Options
+
+### 🌐 **Streamlit Community Cloud (Recommended)**
+[![Deploy to Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io/ddhegde100/volatility_surface_explorer/main/scripts/ivsurf_retro_terminal.py)
+
+1. Fork this repository
+2. Go to [share.streamlit.io](https://share.streamlit.io/)
+3. Connect your GitHub account
+4. Select your forked repository
+5. Set main file: `scripts/ivsurf_retro_terminal.py`
+6. Deploy
+
+### ☁️ **Alternative Platforms**
+- **Railway.app**: Connect GitHub repo, automatic deployment
+- **Render.com**: Use included `render.yaml` configuration
+- **Heroku**: Use included `Procfile` (requires paid dyno)
+
 ## Installation
 
 ### Prerequisites
-- Python 3.12 or higher
+- Python 3.9 or higher
 - Virtual environment (recommended)
 
-### Setup
+### Local Setup
 ```bash
 # Clone repository
 git clone https://github.com/DDVHegde100/volatility_surface_explorer.git
