@@ -5163,8 +5163,8 @@ class RetroTerminal:
                     st.markdown("**MODEL ACTIONS**")
                     
                     run_jump_model = st.button("🚀 RUN JUMP MODEL", type="primary")
-                    calibrate_jump = st.checkbox("Calibrate to Market Data", value=False)
-                    monte_carlo_jump = st.checkbox("Monte Carlo Simulation", value=True)
+                    calibrate_jump = st.checkbox("Calibrate to Market Data", value=False, key="jump_calibrate_market")
+                    monte_carlo_jump = st.checkbox("Monte Carlo Simulation", value=True, key="jump_monte_carlo")
                     
                     # Jump analysis options
                     st.markdown("**ANALYSIS OPTIONS**")
