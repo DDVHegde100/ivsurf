@@ -5,6 +5,16 @@ A quantitative finance platform for options pricing, volatility modeling, and sw
 [![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://www.python.org/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.28+-red.svg)](https://streamlit.io/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
+## 🚀 Live Demo
+
+**Try IVSURF Terminal Online:**
+
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://ivsurf-terminal.streamlit.app)
+
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/template/IVSURF-Terminal)
+
+*Note: Live deployment link will be updated once the app is deployed*
 [![Deploy](https://img.shields.io/badge/Deploy-Streamlit_Cloud-FF6B6B.svg)](https://share.streamlit.io/)
 
 ## 🚀 Live Demo

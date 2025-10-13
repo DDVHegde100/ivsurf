@@ -1,0 +1,22 @@
+name = "ivsurf-terminal"
+compatibility_date = "2023-10-30"
+
+[build]
+command = "pip install -r requirements.txt"
+
+[[services]]
+protocol = "http"
+internal_port = 8501
+processes = ["app"]
+
+[[services.ports]]
+port = 80
+handlers = ["http"]
+force_https = true
+
+[[services.ports]]
+port = 443
+handlers = ["tls", "http"]
+
+[processes]
+app = "streamlit run scripts/ivsurf_retro_terminal.py --server.port=8501 --server.address=0.0.0.0"
