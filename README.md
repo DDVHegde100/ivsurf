@@ -2,9 +2,9 @@
 
 Advanced options trading terminal with real-time volatility analysis, swing trading predictions, and quantitative finance modeling.
 
-[![Launch Live Demo](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://ivsurf.streamlit.app)
+![IVSURF Terminal](scripts/23.png)
 
-![IVSURF Terminal](scripts/Screenshot%202025-10-13%20at%2011.04.06%20AM.png)
+[![Launch Live Demo](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://ivsurf.streamlit.app)
 
 *Note: Live deployment link will be updated once the app is deployed*
 [![Deploy](https://img.shields.io/badge/Deploy-Streamlit_Cloud-FF6B6B.svg)](https://share.streamlit.io/)
