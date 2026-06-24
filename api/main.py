@@ -15,7 +15,7 @@ from api.routes import opening_range_ws, predict, scan, signals, universes
 app = FastAPI(
     title="IVSURF API",
     description="Opening scanner and signal research API",
-    version="0.3.0",
+    version="1.0.0",
 )
 
 app.add_middleware(

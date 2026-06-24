@@ -1,7 +1,7 @@
 [project]
 name = "ivsurf"
-version = "0.2.0"
-description = "Quantitative finance research platform — volatility surfaces, swing signals, and risk analytics"
+version = "1.0.0"
+description = "Opening-hours volatility scanner and swing trading research platform"
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }

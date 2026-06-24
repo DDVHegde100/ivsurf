@@ -186,9 +186,40 @@ docker run -p 8503:8503 -e ALPACA_API_KEY=... ivsurf
 - Streamlit Community Cloud: 1 GB RAM, shared CPU — sufficient for scanner workloads on small universes (<50 tickers).
 - FastAPI: stateless; scale horizontally. SQLite is single-writer; use Postgres for multi-instance deployments.
 
-## Production Checklist
+## v1.0 Production Checklist
 
-- [ ] Use Alpaca **paper** credentials until strategies are validated
-- [ ] Set `min_score` conservatively on automated paper trading
-- [ ] Do not expose the API publicly without authentication
-- [ ] Monitor Yahoo Finance rate limits on large scans
+Use this before running IVSURF in a shared or production environment.
+
+### Security
+
+- [ ] Set `IVSURF_API_KEY` on any publicly reachable FastAPI instance
+- [ ] Pass the same key to WebSocket clients via `?api_key=...`
+- [ ] Store Alpaca keys and webhook URLs in secrets (Streamlit secrets, GitHub Actions secrets, or your host's env manager) — never commit them
+- [ ] Use Alpaca **paper** credentials (`ALPACA_BASE_URL=https://paper-api.alpaca.markets`) until strategies are validated
+
+### Data and storage
+
+- [ ] Configure Alpaca for 1-min + premarket bars; yfinance fallback is delayed and limited to ~7 days of 1-min history
+- [ ] For multi-instance API deployments, set `IVSURF_DATABASE_URL` to a shared PostgreSQL database
+- [ ] Back up `data/ivsurf.db` (SQLite) or your Postgres instance regularly if signal history matters
+- [ ] Monitor Yahoo Finance rate limits on large universes (>50 tickers)
+
+### Trading and automation
+
+- [ ] Keep `IVSURF_GUARDRAILS_ENABLED=true` for any automated order flow
+- [ ] Set conservative `IVSURF_MAX_DAILY_LOSS_PCT`, `IVSURF_MAX_OPEN_POSITIONS`, and `IVSURF_MAX_NOTIONAL_PER_TRADE`
+- [ ] Require explicit UI confirmation before submitting orders in the Opening Scanner
+- [ ] Use `IVSURF_BROKER=simulated` for demos and integration tests without external API calls
+- [ ] Set `min_score` conservatively on scheduled pre-market scans and webhook alerts
+
+### Operations
+
+- [ ] Run `pytest` (141+ tests) before deploying config changes
+- [ ] Verify `/health` returns `"status": "ok"` after API deploy
+- [ ] Confirm the pre-market GitHub Action schedule (13:00 UTC weekdays) matches your timezone needs
+- [ ] Retrain the ML ranker after sufficient labeled signals: `python scripts/train_ml_ranker.py --min-samples 30`
+- [ ] Pin Python 3.9–3.11 in production (CI-tested versions)
+
+### Release
+
+Tagged releases: [GitHub Releases](https://github.com/DDVHegde100/ivsurf/releases). See [CHANGELOG.md](CHANGELOG.md) for version history.

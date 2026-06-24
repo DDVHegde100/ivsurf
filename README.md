@@ -20,15 +20,16 @@ IVSURF combines classical quant finance with opening-hours volatility scanning i
 - **Quant models** — GARCH, regime switching, Heston MC, VaR, Monte Carlo simulation
 - **ML forecasting** — sklearn ensemble + walk-forward XGBoost ranker (TensorFlow LSTM optional)
 - **Risk analytics** — VaR, stress testing, regime-aware backtesting
-- **REST API** — FastAPI endpoints for scan, predict, and signal history
+- **REST API** — FastAPI endpoints for scan, predict, signal history, and live opening-range websocket
+- **Paper trading** — Alpaca and simulated brokers with pre-trade guardrails
 
 **Data sources:** Yahoo Finance (default). Alpaca optional for 1-min bars and paper trading.
 
 ## Quick Start
 
 ```bash
-git clone https://github.com/DDVHegde100/volatility_surface_explorer.git
-cd volatility_surface_explorer
+git clone https://github.com/DDVHegde100/ivsurf.git
+cd ivsurf
 
 python -m venv .venv
 source .venv/bin/activate
@@ -133,11 +134,13 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for Streamlit Cloud, FastAPI, and Alpaca setu
 
 ## Known Limitations
 
-- Swing scanner uses **heuristic scoring**, not trained ML models
-- Yahoo Finance data is delayed and may break without notice
+- Opening scanner uses **heuristic scoring** with optional ML re-ranking when a trained model is present
+- Yahoo Finance data is delayed and may break without notice; Alpaca recommended for intraday bars
 - TensorFlow, arch, statsmodels, and numba are optional — features degrade gracefully if missing
-- Paper trading requires Alpaca credentials; disabled by default in the UI
-- No persistence, authentication, or live trading without explicit configuration
+- Live order submission requires explicit user confirmation; guardrails are enabled by default
+- Not investment advice — research and educational use only
+
+See [CHANGELOG.md](CHANGELOG.md) for release history and [DEPLOYMENT.md](DEPLOYMENT.md) for the v1.0 production checklist.
 
 ## License
 

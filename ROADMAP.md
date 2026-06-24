@@ -35,6 +35,12 @@ IVSURF is pivoting from a broad quant demo to a **focused opening-hours volatili
 - [x] Broker abstraction beyond Alpaca
 - [x] Real-time websocket feed for opening range updates
 
+## v1.0 (2026-06-24)
+
+- [x] Version bump and changelog
+- [x] Production deployment checklist
+- [x] GitHub release tag `v1.0.0`
+
 ## Non-Goals
 
 - Replacing Bloomberg or institutional OMS systems
