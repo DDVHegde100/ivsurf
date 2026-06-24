@@ -128,8 +128,8 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for details. Docker, Render, and Fly.io confi
 - Swing scanner uses **heuristic scoring**, not trained ML models
 - Yahoo Finance data is delayed and may break without notice
 - TensorFlow, arch, statsmodels, and numba are optional — features degrade gracefully if missing
-- Rust performance module (`src/`) exists but is not wired to Python
-- No persistence, authentication, or live trading
+- Paper trading requires Alpaca credentials; disabled by default in the UI
+- No persistence, authentication, or live trading without explicit configuration
 
 ## License
 
