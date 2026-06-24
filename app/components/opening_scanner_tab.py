@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
+
 import streamlit as st
 import pandas as pd
 
@@ -16,6 +18,7 @@ from engine.data.universe import (
     save_user_watchlist,
 )
 from engine.execution.factory import create_executor, list_brokers
+from engine.feed.opening_range import OpeningRangeFeed
 from engine.signals.opening_scanner import scan_universe
 from engine.signals.ml_ranker import load_ranker_if_available
 from engine.signals.opening_options import enrich_scan_with_options, recommend_from_scan_row
@@ -82,6 +85,8 @@ def render_opening_scanner_tab() -> None:
             disabled=ranker is None,
             help="Requires a trained model at data/models/opening_ranker.joblib",
         )
+
+    _render_live_or_monitor(parse_ticker_list(tickers_raw))
 
     if st.button("Run Opening Scan", type="primary", use_container_width=True):
         if selected_universe == "custom":
@@ -156,6 +161,84 @@ def render_opening_scanner_tab() -> None:
         _render_options_plays_panel(df)
         _render_alert_panel(df)
         _render_paper_trading_panel(df)
+
+
+def _or_snapshots_to_df(snapshots: list[dict]) -> pd.DataFrame:
+    rows = []
+    for snap in snapshots:
+        w5 = snap.get("windows", {}).get("5m", {})
+        w15 = snap.get("windows", {}).get("15m", {})
+        w30 = snap.get("windows", {}).get("30m", {})
+        rows.append(
+            {
+                "Ticker": snap["ticker"],
+                "Last": snap["last_price"],
+                "Gap %": snap["gap_pct"],
+                "OR 5m %": w5.get("range_pct", 0.0),
+                "OR 15m %": w15.get("range_pct", 0.0),
+                "OR 30m %": w30.get("range_pct", 0.0),
+                "Breakout": snap.get("breakout", "inside"),
+                "Rel vol": snap.get("relative_volume_open", 0.0),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def _show_or_snapshots(tickers: list[str]) -> None:
+    if not tickers:
+        st.info("Add tickers to monitor.")
+        return
+
+    feed = OpeningRangeFeed()
+    with st.spinner(f"Fetching opening range for {len(tickers)} ticker(s)..."):
+        snapshots = feed.snapshots(tickers)
+
+    if not snapshots:
+        st.warning("No opening range data available for the selected tickers.")
+        return
+
+    df = _or_snapshots_to_df(snapshots)
+    st.caption(f"Updated {snapshots[0].get('updated_at', '—')} ET")
+    st.dataframe(
+        df.assign(
+            **{
+                "Last": df["Last"].map(lambda x: f"${x:.2f}"),
+                "Gap %": df["Gap %"].map(lambda x: f"{x:+.2f}%"),
+                "OR 5m %": df["OR 5m %"].map(lambda x: f"{x:.2f}%"),
+                "OR 15m %": df["OR 15m %"].map(lambda x: f"{x:.2f}%"),
+                "OR 30m %": df["OR 30m %"].map(lambda x: f"{x:.2f}%"),
+                "Rel vol": df["Rel vol"].map(lambda x: f"{x:.2f}x"),
+            }
+        ),
+        use_container_width=True,
+        hide_index=True,
+    )
+
+
+@st.fragment(run_every=timedelta(seconds=30))
+def _live_or_poll(tickers: list[str]) -> None:
+    _show_or_snapshots(tickers)
+
+
+def _render_live_or_monitor(default_tickers: list[str]) -> None:
+    """Live opening range panel — polls the same feed as the websocket API."""
+    with st.expander("Live Opening Range", expanded=False):
+        st.caption(
+            "Monitor 5m / 15m / 30m opening ranges during the session. "
+            "Uses the same engine as the `/ws/opening-range` API."
+        )
+        monitor_raw = st.text_input(
+            "Monitor tickers",
+            value=", ".join(default_tickers[:10]),
+            key="or_monitor_tickers",
+        )
+        tickers = parse_ticker_list(monitor_raw)
+        auto_refresh = st.checkbox("Auto-refresh every 30s", value=False, key="or_auto_refresh")
+
+        if auto_refresh:
+            _live_or_poll(tickers)
+        elif st.button("Refresh now", key="or_refresh_once"):
+            _show_or_snapshots(tickers)
 
 
 def _render_watchlist_manager(current_tickers: list[str]) -> None:

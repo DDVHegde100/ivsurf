@@ -29,8 +29,12 @@ def to_eastern(ts: datetime | pd.Timestamp) -> pd.Timestamp:
 
 
 def is_trading_day(d: date) -> bool:
-    """Weekday check (no holiday calendar yet)."""
-    return d.weekday() < 5
+    """Weekday check excluding NYSE market holidays."""
+    if d.weekday() >= 5:
+        return False
+    from engine.data.holidays import is_market_holiday
+
+    return not is_market_holiday(d)
 
 
 def session_bounds(trading_date: date, session: SessionType = "all") -> tuple[datetime, datetime]:
