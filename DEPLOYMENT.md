@@ -51,6 +51,23 @@ Set the same Alpaca and database env vars as the Streamlit app.
 
 Copy `.env.example` to `.env` for local development.
 
+## Scheduled Pre-market Scan
+
+A GitHub Action runs the opening scanner on weekdays at **13:00 UTC** (~8:00 AM EST / 9:00 AM EDT):
+
+- Workflow: [`.github/workflows/premarket_scan.yml`](.github/workflows/premarket_scan.yml)
+- Manual trigger: **Actions → Pre-market Scan → Run workflow**
+- Optional secrets: `ALPACA_API_KEY`, `ALPACA_SECRET_KEY`, `ALPACA_BASE_URL` (for 1-min bars)
+- Results uploaded as workflow artifacts (`premarket_scan.json`)
+
+Run locally:
+
+```bash
+python scripts/run_premarket_scan.py --force --output data/premarket_scan.json
+```
+
+Use `--force` on weekends; omit it to skip non-trading days.
+
 ## Docker
 
 If a `Dockerfile` is present in the repo root:

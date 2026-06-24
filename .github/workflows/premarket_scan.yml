@@ -1,0 +1,81 @@
+name: Pre-market Scan
+
+on:
+  schedule:
+    # 13:00 UTC Mon–Fri ≈ 8:00 AM EST / 9:00 AM EDT (pre-open window)
+    - cron: "0 13 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      min_score:
+        description: Minimum opening score
+        required: false
+        default: "20"
+      force:
+        description: Run even on weekends
+        type: boolean
+        default: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install arch statsmodels xgboost
+
+      - name: Run pre-market scan
+        env:
+          ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+          ALPACA_BASE_URL: ${{ secrets.ALPACA_BASE_URL }}
+          IVSURF_DB_PATH: data/ivsurf.db
+        run: |
+          FORCE_FLAG=""
+          if [ "${{ github.event.inputs.force }}" = "true" ]; then
+            FORCE_FLAG="--force"
+          fi
+          MIN_SCORE="${{ github.event.inputs.min_score || '20' }}"
+          python scripts/run_premarket_scan.py \
+            --min-score "$MIN_SCORE" \
+            --output data/premarket_scan.json \
+            $FORCE_FLAG
+
+      - name: Upload scan report
+        uses: actions/upload-artifact@v4
+        with:
+          name: premarket-scan-${{ github.run_id }}
+          path: data/premarket_scan.json
+          if-no-files-found: error
+
+      - name: Print top picks
+        if: success()
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path("data/premarket_scan.json")
+          summary = json.loads(path.read_text())
+          if summary.get("skipped"):
+              print("Scan skipped:", summary.get("reason"))
+          elif summary.get("count", 0) == 0:
+              print("No tickers met the minimum score.")
+          else:
+              print("Top 5 picks:")
+              for row in summary["results"][:5]:
+                  print(
+                      f"  {row['ticker']:6s}  score={row.get('opening_score', 0):.0f}  "
+                      f"gap={row.get('gap_pct', 0):+.2f}%  dir={row.get('direction', '?')}"
+                  )
+          PY
