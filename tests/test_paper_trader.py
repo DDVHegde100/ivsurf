@@ -3,6 +3,7 @@
 import pytest
 
 from engine.execution.paper_trader import AlpacaPaperTrader
+from engine.execution.guardrails import TradingGuardrails
 
 
 class TestAlpacaPaperTrader:
@@ -49,7 +50,27 @@ class TestAlpacaPaperTrader:
             {"ticker": "AMD", "opening_score": 55, "price": 100, "direction": "up"},
         ]
         placed = trader.execute_top_signals(signals, max_orders=2)
-        assert len(placed) == 2
+        accepted = [p for p in placed if p["order"]["status"] == "accepted"]
+        assert len(accepted) == 2
+
+    def test_execute_signal_blocked_by_guardrails(self):
+        guardrails = TradingGuardrails(
+            enabled=True,
+            max_daily_loss_pct=2.0,
+            max_open_positions=5,
+            max_orders_per_day=10,
+            max_notional_per_trade=1000.0,
+        )
+        trader = AlpacaPaperTrader(dry_run=True, guardrails=guardrails)
+        trader.get_account = lambda: {"equity": "97000", "last_equity": "100000"}  # type: ignore[method-assign]
+        trader.get_positions = lambda: []  # type: ignore[method-assign]
+
+        result = trader.execute_signal(
+            {"ticker": "AAPL", "opening_score": 80, "price": 100, "direction": "up"},
+        )
+        assert result is not None
+        assert result["status"] == "blocked"
+        assert "Daily loss limit" in result["reason"]
 
     def test_not_configured_raises_without_dry_run(self, monkeypatch):
         monkeypatch.delenv("ALPACA_API_KEY", raising=False)

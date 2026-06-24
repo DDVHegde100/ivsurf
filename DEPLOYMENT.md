@@ -100,6 +100,21 @@ python scripts/run_premarket_scan.py --alert --alert-threshold 50
 
 The pre-market GitHub Action passes `--alert` automatically when webhook secrets are configured. Use `--alert-dry-run` to preview payloads locally.
 
+### Trading guardrails
+
+Paper and live Alpaca orders pass through pre-trade guardrails:
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `IVSURF_GUARDRAILS_ENABLED` | `true` | Toggle all guardrails |
+| `IVSURF_MAX_DAILY_LOSS_PCT` | `2` | Block orders when daily P&L falls below this % |
+| `IVSURF_MAX_OPEN_POSITIONS` | `5` | Max concurrent open positions |
+| `IVSURF_MAX_ORDERS_PER_DAY` | `10` | Max orders submitted per session/day |
+| `IVSURF_MAX_NOTIONAL_PER_TRADE` | `1000` | Cap per-order notional |
+| `IVSURF_ONE_POSITION_PER_SYMBOL` | `true` | Prevent duplicate symbol exposure |
+
+Blocked orders return `status: blocked` with a reason in the Opening Scanner paper trading panel.
+
 ## Scheduled Pre-market Scan
 
 A GitHub Action runs the opening scanner on weekdays at **13:00 UTC** (~8:00 AM EST / 9:00 AM EDT):

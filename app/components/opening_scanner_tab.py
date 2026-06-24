@@ -296,9 +296,26 @@ def _render_paper_trading_panel(results: pd.DataFrame) -> None:
         if alpaca_ready and not dry_run:
             try:
                 account = trader_probe.get_account()
+                positions = trader_probe.get_positions()
                 st.metric("Buying power", f"${float(account.get('buying_power', 0)):,.0f}")
+                daily_pnl = trader_probe.guardrails.daily_pnl_pct(account)
+                if daily_pnl is not None:
+                    st.metric("Daily P&L", f"{daily_pnl:+.2f}%")
+                st.caption(
+                    f"Guardrails: max loss {trader_probe.guardrails.max_daily_loss_pct:.1f}%, "
+                    f"max positions {trader_probe.guardrails.max_open_positions}, "
+                    f"max notional ${trader_probe.guardrails.max_notional_per_trade:,.0f}, "
+                    f"open positions {len(positions)}"
+                )
             except Exception as exc:
                 st.error(f"Could not load Alpaca account: {exc}")
+        else:
+            g = trader_probe.guardrails
+            st.caption(
+                f"Guardrails active: max daily loss {g.max_daily_loss_pct:.1f}%, "
+                f"max {g.max_open_positions} positions, "
+                f"${g.max_notional_per_trade:,.0f}/trade"
+            )
 
         confirm = st.checkbox(
             "I confirm I want to submit paper market orders for the top ranked signals",
@@ -329,9 +346,14 @@ def _render_paper_trading_panel(results: pd.DataFrame) -> None:
                 st.warning("No signals met the trade minimum score or notional threshold.")
                 return
 
+            accepted = [p for p in placed if p["order"].get("status") == "accepted"]
+            blocked = [p for p in placed if p["order"].get("status") == "blocked"]
             st.session_state["opening_paper_orders"] = placed
             mode = "simulated" if dry_run else "submitted"
-            st.success(f"{len(placed)} order(s) {mode}.")
+            if accepted:
+                st.success(f"{len(accepted)} order(s) {mode}.")
+            if blocked:
+                st.warning(f"{len(blocked)} order(s) blocked by guardrails.")
 
         if "opening_paper_orders" in st.session_state:
             rows = []
@@ -345,6 +367,7 @@ def _render_paper_trading_panel(results: pd.DataFrame) -> None:
                         "side": order.get("side"),
                         "qty": order.get("qty"),
                         "status": order.get("status"),
+                        "reason": order.get("reason"),
                         "order_id": order.get("id"),
                     }
                 )

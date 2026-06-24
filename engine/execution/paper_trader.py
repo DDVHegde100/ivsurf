@@ -1,9 +1,8 @@
-"""
-Alpaca paper-trading adapter for opening scanner signals.
+"""Alpaca paper-trading adapter for opening scanner signals.
 
 Requires ALPACA_API_KEY and ALPACA_SECRET_KEY. Uses ALPACA_BASE_URL
 (defaults to paper-api.alpaca.markets). Set dry_run=True to log orders
-without submitting them.
+without submitting them. Pre-trade guardrails apply via TradingGuardrails.
 """
 
 from __future__ import annotations
@@ -11,9 +10,10 @@ from __future__ import annotations
 import json
 import os
 import urllib.error
-import urllib.parse
 import urllib.request
 from typing import Any, Literal
+
+from engine.execution.guardrails import TradingGuardrails
 
 OrderSide = Literal["buy", "sell"]
 
@@ -21,17 +21,26 @@ OrderSide = Literal["buy", "sell"]
 class AlpacaPaperTrader:
     """Submit market orders to Alpaca paper (or live) accounts."""
 
-    def __init__(self, dry_run: bool = False):
+    def __init__(
+        self,
+        dry_run: bool = False,
+        guardrails: TradingGuardrails | None = None,
+    ):
         self._api_key = os.environ.get("ALPACA_API_KEY", "").strip()
         self._secret_key = os.environ.get("ALPACA_SECRET_KEY", "").strip()
         self._base_url = os.environ.get(
             "ALPACA_BASE_URL", "https://paper-api.alpaca.markets"
         ).rstrip("/")
         self._dry_run = dry_run
+        self._guardrails = guardrails if guardrails is not None else TradingGuardrails.from_env()
 
     @property
     def configured(self) -> bool:
         return bool(self._api_key and self._secret_key)
+
+    @property
+    def guardrails(self) -> TradingGuardrails:
+        return self._guardrails
 
     def _request(
         self,
@@ -69,6 +78,7 @@ class AlpacaPaperTrader:
                 "status": "dry_run",
                 "buying_power": "100000",
                 "equity": "100000",
+                "last_equity": "100000",
             }
         return self._request("GET", "/v2/account")
 
@@ -109,12 +119,14 @@ class AlpacaPaperTrader:
         *,
         notional_usd: float = 500.0,
         min_score: float = 50.0,
+        orders_placed_today: int = 0,
     ) -> dict[str, Any] | None:
         """
         Convert an opening scanner row into a market order.
 
         Buys on upward gaps, sells (short) on downward gaps when score clears
-        the threshold. Returns the Alpaca order payload or None if skipped.
+        the threshold. Returns the Alpaca order payload, a blocked status dict,
+        or None if skipped.
         """
         score = float(signal.get("opening_score", 0))
         if score < min_score:
@@ -134,6 +146,23 @@ class AlpacaPaperTrader:
         if not ticker:
             return None
 
+        check = self._guardrails.evaluate(
+            account=self.get_account(),
+            positions=self.get_positions(),
+            symbol=ticker,
+            notional_usd=notional_usd,
+            orders_placed_today=orders_placed_today,
+        )
+        if not check.allowed:
+            return {
+                "id": None,
+                "status": "blocked",
+                "symbol": ticker,
+                "side": side,
+                "qty": str(qty),
+                "reason": check.reason,
+            }
+
         return self.submit_market_order(ticker, qty, side)
 
     def execute_top_signals(
@@ -143,17 +172,29 @@ class AlpacaPaperTrader:
         max_orders: int = 3,
         notional_usd: float = 500.0,
         min_score: float = 50.0,
+        orders_placed_today: int = 0,
     ) -> list[dict[str, Any]]:
         """Execute up to max_orders from a ranked scan result list."""
-        placed: list[dict[str, Any]] = []
+        results: list[dict[str, Any]] = []
+        accepted = 0
+        attempted = orders_placed_today
+
         for signal in signals:
-            if len(placed) >= max_orders:
+            if accepted >= max_orders:
                 break
+
             order = self.execute_signal(
                 signal,
                 notional_usd=notional_usd,
                 min_score=min_score,
+                orders_placed_today=attempted,
             )
-            if order is not None:
-                placed.append({"signal": signal, "order": order})
-        return placed
+            if order is None:
+                continue
+
+            results.append({"signal": signal, "order": order})
+            attempted += 1
+            if order.get("status") == "accepted":
+                accepted += 1
+
+        return results
