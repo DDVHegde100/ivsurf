@@ -9,6 +9,7 @@ from engine.data.storage import DataStore
 from engine.execution.paper_trader import AlpacaPaperTrader
 from engine.signals.opening_scanner import scan_universe
 from engine.signals.ml_ranker import load_ranker_if_available
+from engine.signals.opening_options import enrich_scan_with_options, recommend_from_scan_row
 from engine.signals.regime_filter import RegimeFilter
 
 
@@ -114,7 +115,62 @@ def render_opening_scanner_tab() -> None:
             c3.metric("Gap", f"{top.get('gap_pct', 0):+.2f}%")
             c4.metric("Regime", top.get("regime_label", "—"))
 
+        _render_options_plays_panel(df)
         _render_paper_trading_panel(df)
+
+
+def _render_options_plays_panel(results: pd.DataFrame) -> None:
+    """Suggest straddle/strangle plays when opening range is expanded."""
+    with st.expander("Options Plays (Straddle / Strangle)", expanded=False):
+        st.caption(
+            "Volatility play ideas when the 15-minute opening range is wide. "
+            "Theoretical Black-Scholes pricing; enable market quotes for Yahoo mids."
+        )
+        use_market = st.checkbox("Use market option quotes", value=False)
+
+        enriched = enrich_scan_with_options(results, use_market_quotes=use_market)
+        plays = enriched[enriched["options_play_type"] != "none"]
+        if plays.empty:
+            st.info("No tickers with sufficient opening range expansion for an options play.")
+            return
+
+        display = plays[
+            [
+                "ticker",
+                "options_play_type",
+                "or_15m_range_pct",
+                "options_call_strike",
+                "options_put_strike",
+                "options_est_debit",
+                "options_breakeven_up_pct",
+                "options_breakeven_down_pct",
+                "options_rationale",
+            ]
+        ].copy()
+        display.columns = [
+            "Ticker",
+            "Play",
+            "OR 15m %",
+            "Call K",
+            "Put K",
+            "Est debit",
+            "BE up %",
+            "BE down %",
+            "Rationale",
+        ]
+        st.dataframe(display, use_container_width=True, hide_index=True)
+
+        top_play = recommend_from_scan_row(
+            plays.iloc[0].to_dict(),
+            use_market_quotes=use_market,
+        )
+        if top_play["play_type"] != "none":
+            st.markdown(
+                f"**Top play:** {top_play['play_type'].upper()} on **{plays.iloc[0]['ticker']}** — "
+                f"debit ~${top_play.get('estimated_debit', 0):.2f}, "
+                f"breakevens {top_play.get('breakeven_down_pct', 0):+.1f}% / "
+                f"{top_play.get('breakeven_up_pct', 0):+.1f}%"
+            )
 
 
 def _render_paper_trading_panel(results: pd.DataFrame) -> None:

@@ -25,7 +25,7 @@ IVSURF is pivoting from a broad quant demo to a **focused opening-hours volatili
 ## Medium Term (v0.5)
 
 - [x] Train ML ranker on accumulated labeled signals in SQLite
-- [ ] Options-aware opening plays (straddles/strangles on high OR expansion)
+- [x] Options-aware opening plays (straddles/strangles on high OR expansion)
 - [ ] Alert webhooks (Slack, Discord) for scores above threshold
 - [ ] Expand universe management (watchlists, sector filters)
 
