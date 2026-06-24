@@ -26,7 +26,6 @@ volatility_surface_explorer/
 ├── core/                    # Core pricing models
 │   ├── black_scholes.py    # Black-Scholes-Merton implementation
 │   ├── greeks.py           # Option Greeks calculations
-│   ├── heston.py           # Heston stochastic volatility
 │   ├── gaussian_process.py # Surface interpolation
 │   └── jump_models.py      # Jump-diffusion models
 ├── models/                  # Advanced mathematical models
@@ -42,8 +41,7 @@ volatility_surface_explorer/
 ├── portfolio/               # Portfolio optimization
 │   └── regime_backtesting.py # Strategy backtesting
 ├── scripts/                 # Trading interfaces
-│   ├── ivsurf_retro_terminal.py # Main terminal (6000+ lines)
-│   └── ivsurf_pro.py       # Professional interface
+│   └── ivsurf_retro_terminal.py # Main terminal
 ├── visuals/                 # Visualization components
 │   └── plot_surface.py     # 3D volatility surfaces
 └── utils/                   # Data and utilities
@@ -92,13 +90,7 @@ streamlit run scripts/ivsurf_retro_terminal.py --server.port 8503
 
 ### Alternative Interfaces
 ```bash
-# Professional analytics interface
-streamlit run scripts/ivsurf_pro.py --server.port 8502
-
-# Ultimate trading terminal
-streamlit run scripts/ivsurf_ultimate.py --server.port 8501
-
-# Basic dashboard
+# Basic dashboard (options explorer)
 streamlit run dashboard/app.py --server.port 8500
 ```
 
