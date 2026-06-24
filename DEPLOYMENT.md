@@ -49,6 +49,8 @@ Set the same Alpaca and database env vars as the Streamlit app.
 | `ALPACA_BASE_URL` | No | `https://paper-api.alpaca.markets` | Paper or live API base |
 | `IVSURF_DB_PATH` | No | `data/ivsurf.db` | SQLite database path |
 | `IVSURF_API_KEY` | No | — | When set, protected routes require `X-API-Key` header |
+| `IVSURF_DATABASE_URL` | No | — | PostgreSQL URL; when set, replaces SQLite for signals/bars |
+| `IVSURF_DATA_DIR` | No | `data` | Directory for Parquet exports when using Postgres |
 
 Copy `.env.example` to `.env` for local development.
 
@@ -61,6 +63,18 @@ curl -H "X-API-Key: your-key" http://localhost:8000/signals/history
 ```
 
 `/health` stays public and reports `"auth": "required"` or `"disabled"`. Leave `IVSURF_API_KEY` unset for local development without auth.
+
+### PostgreSQL storage
+
+For multiple API replicas or shared signal history, point all instances at the same database:
+
+```bash
+pip install -e ".[postgres]"
+export IVSURF_DATABASE_URL=postgresql://user:pass@host:5432/ivsurf
+uvicorn api.main:app --host 0.0.0.0 --port 8000
+```
+
+Tables are created automatically on startup. When `IVSURF_DATABASE_URL` is unset, IVSURF uses SQLite at `IVSURF_DB_PATH` (default `data/ivsurf.db`).
 
 ## Scheduled Pre-market Scan
 

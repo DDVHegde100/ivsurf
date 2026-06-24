@@ -20,7 +20,7 @@ IVSURF is pivoting from a broad quant demo to a **focused opening-hours volatili
 - [x] Scheduled pre-market scan (cron / GitHub Action)
 - [x] Signal history dashboard with equity curve
 - [x] Authentication on FastAPI routes
-- [ ] Postgres adapter for multi-user deployments
+- [x] Postgres adapter for multi-user deployments
 
 ## Medium Term (v0.5)
 

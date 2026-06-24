@@ -15,29 +15,27 @@ router = APIRouter()
 def signal_history(limit: int = 50):
     """Return recent logged signals from local SQLite store."""
     store = DataStore()
-    with store._connect() as conn:
-        rows = conn.execute(
-            """
-            SELECT id, ticker, signal_type, score, payload, created_at
-            FROM signals
-            ORDER BY created_at DESC
-            LIMIT ?
-            """,
-            (limit,),
-        ).fetchall()
+    rows = store.fetch_signals_with_outcomes(limit=limit)
 
     results = []
+    seen: set[int] = set()
     for row in rows:
-        payload = json.loads(row["payload"]) if row["payload"] else {}
+        signal_id = row["id"]
+        if signal_id in seen:
+            continue
+        seen.add(signal_id)
+        payload = row.get("payload")
+        if isinstance(payload, str):
+            payload = json.loads(payload) if payload else {}
         results.append(
             {
-                "id": row["id"],
+                "id": signal_id,
                 "ticker": row["ticker"],
                 "signal_type": row["signal_type"],
                 "score": row["score"],
-                "payload": payload,
-                "created_at": row["created_at"],
+                "payload": payload or {},
+                "created_at": str(row["created_at"]),
             }
         )
 
-    return {"count": len(results), "signals": results}
+    return {"count": len(results), "signals": results, "dialect": store.dialect}
