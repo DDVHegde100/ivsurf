@@ -1,0 +1,46 @@
+# Roadmap
+
+IVSURF is pivoting from a broad quant demo to a **focused opening-hours volatility scanner** with walk-forward validation and optional paper trading.
+
+## Completed (v0.3)
+
+- [x] Engine extraction from Streamlit monolith
+- [x] Intraday data layer (Alpaca + yfinance fallback)
+- [x] Opening volatility scanner with regime filter
+- [x] Walk-forward ML ranker and outcome labeling
+- [x] FastAPI layer (`/scan`, `/predict`, `/signals/history`)
+- [x] Opening Scanner + Signal Performance UI tabs
+- [x] Retro/Modern theme toggle
+- [x] Alpaca paper trader adapter (dry-run + live)
+- [x] CI test suite (57+ unit tests)
+
+## Near Term (v0.4)
+
+- [ ] Wire paper trader into Opening Scanner tab (explicit user confirmation)
+- [ ] Scheduled pre-market scan (cron / GitHub Action)
+- [ ] Signal history dashboard with equity curve
+- [ ] Authentication on FastAPI routes
+- [ ] Postgres adapter for multi-user deployments
+
+## Medium Term (v0.5)
+
+- [ ] Train ML ranker on accumulated labeled signals in SQLite
+- [ ] Options-aware opening plays (straddles/strangles on high OR expansion)
+- [ ] Alert webhooks (Slack, Discord) for scores above threshold
+- [ ] Expand universe management (watchlists, sector filters)
+
+## Long Term
+
+- [ ] Live trading guardrails (max daily loss, position limits)
+- [ ] Broker abstraction beyond Alpaca
+- [ ] Real-time websocket feed for opening range updates
+
+## Non-Goals
+
+- Replacing Bloomberg or institutional OMS systems
+- Unattended live trading without explicit user configuration
+- Crypto or forex (US equities focus)
+
+## How to Influence the Roadmap
+
+Open a GitHub issue with the `enhancement` label. PRs that implement roadmap items with tests are welcome.

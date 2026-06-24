@@ -12,15 +12,17 @@ Quantitative finance research platform for volatility surface analysis, swing si
 
 ## What It Does
 
-IVSURF combines classical quant finance with heuristic swing scoring in a Streamlit terminal:
+IVSURF combines classical quant finance with opening-hours volatility scanning in a Streamlit terminal:
 
+- **Opening scanner** — ranks tickers by gap, premarket volume, opening range, and regime-adjusted scores
 - **Market scanner** — ranks NASDAQ tickers by rule-based swing opportunity scores
 - **Volatility surfaces** — builds and visualizes IV surfaces from Yahoo Finance options chains
 - **Quant models** — GARCH, regime switching, Heston MC, VaR, Monte Carlo simulation
-- **ML forecasting** — sklearn ensemble volatility forecasting (TensorFlow LSTM optional)
+- **ML forecasting** — sklearn ensemble + walk-forward XGBoost ranker (TensorFlow LSTM optional)
 - **Risk analytics** — VaR, stress testing, regime-aware backtesting
+- **REST API** — FastAPI endpoints for scan, predict, and signal history
 
-**Data source:** Yahoo Finance (free, delayed, unofficial). No broker integration or order execution.
+**Data sources:** Yahoo Finance (default). Alpaca optional for 1-min bars and paper trading.
 
 ## Quick Start
 
@@ -33,6 +35,10 @@ source .venv/bin/activate
 
 pip install -r requirements.txt
 streamlit run scripts/ivsurf_retro_terminal.py --server.port 8503
+
+# Optional: REST API
+pip install -e ".[api]"
+uvicorn api.main:app --reload --port 8000
 ```
 
 ### Optional Dependencies
@@ -51,6 +57,9 @@ pip install -e ".[all]"          # everything
 
 ```
 ivsurf/
+├── engine/                  # Business logic (data, features, signals, backtest, execution)
+├── api/                     # FastAPI routes
+├── app/                     # Streamlit UI components and themes
 ├── core/                    # Black-Scholes, Greeks, interpolation, GP smoothing
 ├── models/                  # GARCH, regime switching, Heston, jump diffusion
 ├── ml/                      # Volatility forecasting, neural networks
@@ -62,8 +71,7 @@ ivsurf/
 ├── utils/                   # Yahoo Finance data fetcher
 ├── scripts/
 │   └── ivsurf_retro_terminal.py   # Main Streamlit app
-├── dashboard/
-│   └── app.py               # Lightweight options explorer
+├── docs/                    # Architecture and design docs
 └── tests/                   # pytest suite
 ```
 
@@ -121,7 +129,7 @@ Streamlit Community Cloud (recommended):
 3. Set main file: `scripts/ivsurf_retro_terminal.py`
 4. Deploy
 
-See [DEPLOYMENT.md](DEPLOYMENT.md) for details. Docker, Render, and Fly.io configs are also included.
+See [DEPLOYMENT.md](DEPLOYMENT.md) for Streamlit Cloud, FastAPI, and Alpaca setup. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for system design.
 
 ## Known Limitations
 

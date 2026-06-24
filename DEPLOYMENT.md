@@ -1,25 +1,73 @@
-# Streamlit Community Cloud Deployment
+# Deployment
 
-This app is designed to be deployed on Streamlit Community Cloud.
+## Streamlit UI (Community Cloud)
 
-## Deployment Steps:
+1. Fork [ivsurf](https://github.com/DDVHegde100/ivsurf)
+2. Go to [share.streamlit.io](https://share.streamlit.io/)
+3. Connect GitHub and select your fork
+4. Set main file: `scripts/ivsurf_retro_terminal.py`
+5. Deploy
 
-1. Go to https://share.streamlit.io/
-2. Connect your GitHub account
-3. Select repository: DDVHegde100/volatility_surface_explorer
-4. Choose branch: main
-5. Set main file path: scripts/ivsurf_retro_terminal.py
-6. Click "Deploy"
+### Streamlit secrets (optional)
 
-Your app will be available at: https://ivsurf-volatility-explorer.streamlit.app/
+For intraday bars and paper trading, add secrets in the Streamlit dashboard:
 
-## Environment Variables (if needed):
-No special environment variables required for basic deployment.
+```toml
+ALPACA_API_KEY = "your-key"
+ALPACA_SECRET_KEY = "your-secret"
+ALPACA_BASE_URL = "https://paper-api.alpaca.markets"
+```
 
-## Resources:
-- Memory: 1GB RAM (sufficient for most operations)
-- CPU: Shared CPU (adequate for real-time data processing)
-- Storage: 100MB (enough for temporary data)
+Without Alpaca credentials the opening scanner falls back to yfinance 1-min data (limited history).
 
-## Custom Domain:
-Streamlit Community Cloud provides a default subdomain, but you can configure a custom domain in the settings.
+## FastAPI
+
+Run locally or deploy to any ASGI host (Railway, Fly.io, Render):
+
+```bash
+pip install -e ".[api]"
+uvicorn api.main:app --host 0.0.0.0 --port 8000
+```
+
+Endpoints:
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/health` | Health check |
+| POST | `/scan` | Run opening scanner on ticker list |
+| GET | `/predict/{ticker}` | Single-ticker scan + ML rank |
+| GET | `/signals/history` | Stored signal history from SQLite |
+
+Set the same Alpaca and database env vars as the Streamlit app.
+
+## Environment Variables
+
+| Variable | Required | Default | Purpose |
+|----------|----------|---------|---------|
+| `ALPACA_API_KEY` | No | — | Alpaca API key |
+| `ALPACA_SECRET_KEY` | No | — | Alpaca secret |
+| `ALPACA_BASE_URL` | No | `https://paper-api.alpaca.markets` | Paper or live API base |
+| `IVSURF_DB_PATH` | No | `data/ivsurf.db` | SQLite database path |
+
+Copy `.env.example` to `.env` for local development.
+
+## Docker
+
+If a `Dockerfile` is present in the repo root:
+
+```bash
+docker build -t ivsurf .
+docker run -p 8503:8503 -e ALPACA_API_KEY=... ivsurf
+```
+
+## Resources
+
+- Streamlit Community Cloud: 1 GB RAM, shared CPU — sufficient for scanner workloads on small universes (<50 tickers).
+- FastAPI: stateless; scale horizontally. SQLite is single-writer; use Postgres for multi-instance deployments.
+
+## Production Checklist
+
+- [ ] Use Alpaca **paper** credentials until strategies are validated
+- [ ] Set `min_score` conservatively on automated paper trading
+- [ ] Do not expose the API publicly without authentication
+- [ ] Monitor Yahoo Finance rate limits on large scans
