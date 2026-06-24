@@ -79,6 +79,7 @@ from ml.neural_networks import LSTMVolatilityForecaster, LSTMConfig, NetworkArch
 from visuals.plot_surface import plot_vol_surface_plotly
 from visuals.heatmap_greeks import GreeksHeatmapGenerator
 from utils.data_cleaning import OptionsDataCleaner
+from app.ui import load_css
 from app.components.opening_scanner_tab import render_opening_scanner_tab
 from app.components.performance_dashboard import render_performance_dashboard
 from engine.data.cache import MarketDataCache
@@ -2834,6 +2835,13 @@ class RetroTerminal:
     def run(self):
         """Main application runner"""
         self.set_page_config()
+
+        with st.sidebar:
+            st.markdown("### IVSURF")
+            theme = st.radio("Theme", ["Retro", "Modern"], index=0, horizontal=True)
+            st.caption("v0.3 — Opening scanner enabled")
+
+        load_css(theme.lower())
         self.render_header()
         
         # Enhanced Navigation with new advanced features

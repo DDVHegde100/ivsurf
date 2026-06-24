@@ -1,0 +1,30 @@
+/* Retro terminal theme — phosphor green on black */
+
+.stApp {
+  --color-bg: #000000;
+  --color-surface: #001100;
+  --color-border: #00ff41;
+  --color-text: #00ff41;
+  --color-text-muted: #66ff66;
+  --color-accent: #00ff41;
+  --color-long: #00ff41;
+  --color-short: #ff4444;
+  --color-neutral: #ffff00;
+}
+
+.stApp {
+  background: linear-gradient(145deg, #0a0a0a 0%, #1a1a1a 50%, #0f0f0f 100%);
+}
+
+.stApp, .stApp p, .stApp label, .stApp span {
+  font-family: "Courier Prime", "Courier New", monospace;
+}
+
+section[data-testid="stSidebar"] {
+  background: #001100;
+  border-right: 1px solid #00ff41;
+}
+
+section[data-testid="stSidebar"] .stMarkdown {
+  color: #00ff41;
+}

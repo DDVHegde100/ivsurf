@@ -1,0 +1,48 @@
+/* Modern dashboard theme — clean dark quant UI */
+
+.stApp {
+  --color-bg: #0d1117;
+  --color-surface: #161b22;
+  --color-border: #30363d;
+  --color-text: #e6edf3;
+  --color-text-muted: #8b949e;
+  --color-accent: #58a6ff;
+  --color-long: #3fb950;
+  --color-short: #f85149;
+  --color-neutral: #d29922;
+  background: var(--color-bg) !important;
+}
+
+.stApp p,
+.stApp label,
+.stApp span,
+.stApp h1,
+.stApp h2,
+.stApp h3 {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif !important;
+  color: var(--color-text) !important;
+}
+
+section[data-testid="stSidebar"] {
+  background: var(--color-surface) !important;
+  border-right: 1px solid var(--color-border) !important;
+}
+
+section[data-testid="stSidebar"] .stMarkdown {
+  color: var(--color-text) !important;
+}
+
+.terminal-box,
+.terminal-header {
+  border-color: var(--color-border) !important;
+  background: var(--color-surface) !important;
+}
+
+.terminal-prompt,
+.terminal-title {
+  color: var(--color-text) !important;
+  text-shadow: none !important;
+}
+
+.scanner-header h3 { color: var(--color-text) !important; }
+.scanner-header p { color: var(--color-text-muted) !important; }

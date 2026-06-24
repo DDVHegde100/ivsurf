@@ -1,0 +1,58 @@
+/* IVSURF design system — shared tokens and layout */
+
+:root {
+  --color-bg: #0d1117;
+  --color-surface: #161b22;
+  --color-border: #30363d;
+  --color-text: #e6edf3;
+  --color-text-muted: #8b949e;
+  --color-accent: #58a6ff;
+  --color-long: #3fb950;
+  --color-short: #f85149;
+  --color-neutral: #d29922;
+  --font-mono: "JetBrains Mono", "Courier New", monospace;
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  --radius: 6px;
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+}
+
+.gain-positive { color: var(--color-long) !important; font-weight: 600; }
+.gain-negative { color: var(--color-short) !important; font-weight: 600; }
+.gain-neutral  { color: var(--color-neutral) !important; }
+
+.scanner-header {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.scanner-header h3 {
+  font-family: var(--font-sans);
+  color: var(--color-text);
+  margin: 0 0 var(--space-xs) 0;
+  font-size: 1.1rem;
+}
+
+.scanner-header p {
+  color: var(--color-text-muted);
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.metric-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-md);
+  text-align: center;
+}
+
+[data-testid="stDataFrame"] {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}
