@@ -1,6 +1,7 @@
 """Market data fetchers and caching."""
 
-from utils.fetch_data import (
+from engine.data.cache import MarketDataCache, TTLCache
+from engine.data.fetcher import (
     OptionsDataFetcher,
     get_options_chain,
     get_single_option_quote,
@@ -8,7 +9,9 @@ from utils.fetch_data import (
 )
 
 __all__ = [
+    "MarketDataCache",
     "OptionsDataFetcher",
+    "TTLCache",
     "get_options_chain",
     "get_single_option_quote",
     "get_stock_price",
