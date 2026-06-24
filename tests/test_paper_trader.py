@@ -2,8 +2,10 @@
 
 import pytest
 
-from engine.execution.paper_trader import AlpacaPaperTrader
 from engine.execution.guardrails import TradingGuardrails
+from engine.execution.paper_trader import AlpacaPaperTrader
+from engine.execution.brokers.simulated import SimulatedBroker
+from engine.execution.signal_executor import SignalExecutor
 
 
 class TestAlpacaPaperTrader:
@@ -61,9 +63,9 @@ class TestAlpacaPaperTrader:
             max_orders_per_day=10,
             max_notional_per_trade=1000.0,
         )
-        trader = AlpacaPaperTrader(dry_run=True, guardrails=guardrails)
-        trader.get_account = lambda: {"equity": "97000", "last_equity": "100000"}  # type: ignore[method-assign]
-        trader.get_positions = lambda: []  # type: ignore[method-assign]
+        broker = SimulatedBroker(equity=97_000, last_equity=100_000)
+        executor = SignalExecutor(broker, guardrails=guardrails)
+        trader = AlpacaPaperTrader(executor=executor)
 
         result = trader.execute_signal(
             {"ticker": "AAPL", "opening_score": 80, "price": 100, "direction": "up"},

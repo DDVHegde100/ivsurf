@@ -32,7 +32,7 @@ IVSURF is pivoting from a broad quant demo to a **focused opening-hours volatili
 ## Long Term
 
 - [x] Live trading guardrails (max daily loss, position limits)
-- [ ] Broker abstraction beyond Alpaca
+- [x] Broker abstraction beyond Alpaca
 - [ ] Real-time websocket feed for opening range updates
 
 ## Non-Goals

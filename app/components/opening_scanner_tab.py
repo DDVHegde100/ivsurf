@@ -15,7 +15,7 @@ from engine.data.universe import (
     parse_ticker_list,
     save_user_watchlist,
 )
-from engine.execution.paper_trader import AlpacaPaperTrader
+from engine.execution.factory import create_executor, list_brokers
 from engine.signals.opening_scanner import scan_universe
 from engine.signals.ml_ranker import load_ranker_if_available
 from engine.signals.opening_options import enrich_scan_with_options, recommend_from_scan_row
@@ -256,22 +256,26 @@ def _render_options_plays_panel(results: pd.DataFrame) -> None:
 
 
 def _render_paper_trading_panel(results: pd.DataFrame) -> None:
-    """Optional Alpaca paper execution — requires explicit user confirmation."""
-    with st.expander("Paper Trading (Alpaca)", expanded=False):
+    """Optional broker execution — requires explicit user confirmation."""
+    with st.expander("Order Execution", expanded=False):
         st.caption(
-            "Submit market orders on your Alpaca paper account for the top ranked "
-            "signals. Orders are not placed until you confirm below."
+            "Submit market orders for the top ranked signals via a configured broker. "
+            "Orders are not placed until you confirm below."
         )
 
-        trader_probe = AlpacaPaperTrader()
-        alpaca_ready = trader_probe.configured
+        broker_names = list_brokers()
+        broker_choice = st.selectbox("Broker", broker_names, index=broker_names.index("alpaca"))
+        executor_probe = create_executor(broker_choice, dry_run=True)
+        broker_ready = executor_probe.broker.configured
 
-        if alpaca_ready:
+        if broker_choice == "alpaca" and broker_ready:
             st.success("Alpaca credentials detected.")
+        elif broker_choice == "simulated":
+            st.info("Using simulated broker — no external API calls.")
         else:
             st.info(
-                "No Alpaca credentials found — enable dry run to preview orders, "
-                "or set ALPACA_API_KEY and ALPACA_SECRET_KEY in your environment."
+                "Alpaca not configured — use simulated broker or set "
+                "ALPACA_API_KEY and ALPACA_SECRET_KEY."
             )
 
         c1, c2, c3 = st.columns(3)
@@ -285,40 +289,39 @@ def _render_paper_trading_panel(results: pd.DataFrame) -> None:
             trade_min_score = st.slider("Min score to trade", 0, 100, 50)
 
         dry_run = st.checkbox(
-            "Dry run (simulate orders, do not submit)",
-            value=not alpaca_ready,
-            disabled=not alpaca_ready,
-            help="When Alpaca is not configured, dry run is always used.",
+            "Dry run (Alpaca preview only)",
+            value=broker_choice == "alpaca" and not broker_ready,
+            disabled=broker_choice != "alpaca",
+            help="Simulated broker always runs locally without API calls.",
         )
-        if not alpaca_ready:
+        if broker_choice == "alpaca" and not broker_ready:
             dry_run = True
 
-        if alpaca_ready and not dry_run:
+        if broker_choice == "alpaca" and broker_ready and not dry_run:
             try:
-                account = trader_probe.get_account()
-                positions = trader_probe.get_positions()
+                account = executor_probe.get_account()
+                positions = executor_probe.get_positions()
                 st.metric("Buying power", f"${float(account.get('buying_power', 0)):,.0f}")
-                daily_pnl = trader_probe.guardrails.daily_pnl_pct(account)
+                daily_pnl = executor_probe.guardrails.daily_pnl_pct(account)
                 if daily_pnl is not None:
                     st.metric("Daily P&L", f"{daily_pnl:+.2f}%")
                 st.caption(
-                    f"Guardrails: max loss {trader_probe.guardrails.max_daily_loss_pct:.1f}%, "
-                    f"max positions {trader_probe.guardrails.max_open_positions}, "
-                    f"max notional ${trader_probe.guardrails.max_notional_per_trade:,.0f}, "
+                    f"Broker: {broker_choice} | Guardrails: max loss "
+                    f"{executor_probe.guardrails.max_daily_loss_pct:.1f}%, "
+                    f"max positions {executor_probe.guardrails.max_open_positions}, "
                     f"open positions {len(positions)}"
                 )
             except Exception as exc:
-                st.error(f"Could not load Alpaca account: {exc}")
+                st.error(f"Could not load account: {exc}")
         else:
-            g = trader_probe.guardrails
+            g = executor_probe.guardrails
             st.caption(
-                f"Guardrails active: max daily loss {g.max_daily_loss_pct:.1f}%, "
-                f"max {g.max_open_positions} positions, "
-                f"${g.max_notional_per_trade:,.0f}/trade"
+                f"Broker: {broker_choice} | Guardrails: max daily loss {g.max_daily_loss_pct:.1f}%, "
+                f"max {g.max_open_positions} positions"
             )
 
         confirm = st.checkbox(
-            "I confirm I want to submit paper market orders for the top ranked signals",
+            "I confirm I want to submit market orders for the top ranked signals",
             value=False,
         )
 
@@ -328,11 +331,14 @@ def _render_paper_trading_panel(results: pd.DataFrame) -> None:
             disabled=not confirm,
             use_container_width=True,
         ):
-            trader = AlpacaPaperTrader(dry_run=dry_run)
+            executor = create_executor(
+                broker_choice,
+                dry_run=dry_run if broker_choice == "alpaca" else False,
+            )
             signals = results.to_dict(orient="records")
             try:
                 with st.spinner("Submitting orders..."):
-                    placed = trader.execute_top_signals(
+                    placed = executor.execute_top_signals(
                         signals,
                         max_orders=int(max_orders),
                         notional_usd=float(notional_usd),
@@ -368,6 +374,7 @@ def _render_paper_trading_panel(results: pd.DataFrame) -> None:
                         "qty": order.get("qty"),
                         "status": order.get("status"),
                         "reason": order.get("reason"),
+                        "broker": order.get("broker"),
                         "order_id": order.get("id"),
                     }
                 )

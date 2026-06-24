@@ -113,7 +113,23 @@ Paper and live Alpaca orders pass through pre-trade guardrails:
 | `IVSURF_MAX_NOTIONAL_PER_TRADE` | `1000` | Cap per-order notional |
 | `IVSURF_ONE_POSITION_PER_SYMBOL` | `true` | Prevent duplicate symbol exposure |
 
-Blocked orders return `status: blocked` with a reason in the Opening Scanner paper trading panel.
+Blocked orders return `status: blocked` with a reason in the Opening Scanner order execution panel.
+
+### Broker adapters
+
+Execution uses a pluggable broker interface:
+
+| Broker | `IVSURF_BROKER` | Notes |
+|--------|-----------------|-------|
+| Alpaca | `alpaca` (default) | Paper or live via `ALPACA_BASE_URL` |
+| Simulated | `simulated` | Local dry-run with in-memory positions |
+
+```python
+from engine.execution import create_executor
+
+executor = create_executor("simulated")
+executor.execute_signal({"ticker": "AAPL", "opening_score": 80, "price": 100, "direction": "up"})
+```
 
 ## Scheduled Pre-market Scan
 
