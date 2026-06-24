@@ -155,3 +155,27 @@ class DataStore:
                 """,
                 (signal_id, horizon, realized_return, label),
             )
+
+    def fetch_signals_with_outcomes(
+        self,
+        limit: int = 500,
+        signal_type: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Return signals joined with optional outcome rows, newest first."""
+        query = """
+            SELECT s.id, s.ticker, s.signal_type, s.score, s.payload, s.created_at,
+                   o.horizon, o.realized_return, o.label AS outcome_label
+            FROM signals s
+            LEFT JOIN outcomes o ON o.signal_id = s.id
+        """
+        params: list[Any] = []
+        if signal_type:
+            query += " WHERE s.signal_type = ?"
+            params.append(signal_type)
+        query += " ORDER BY s.created_at DESC, s.id DESC LIMIT ?"
+        params.append(limit)
+
+        with self._connect() as conn:
+            rows = conn.execute(query, params).fetchall()
+
+        return [dict(row) for row in rows]
