@@ -10,6 +10,7 @@ from engine.features.daily import (
     compute_volatility,
     compute_volume_metrics,
 )
+from engine.features.intraday import compute_gap_pct, compute_intraday_features
 from ml.volatility_forecasting import (
     calculate_atr,
     calculate_bollinger_bands,
@@ -24,6 +25,8 @@ __all__ = [
     "calculate_rsi_series",
     "compute_bollinger_position",
     "compute_daily_features",
+    "compute_gap_pct",
+    "compute_intraday_features",
     "compute_macd",
     "compute_momentum",
     "compute_moving_averages",
