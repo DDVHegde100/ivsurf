@@ -79,6 +79,7 @@ from ml.neural_networks import LSTMVolatilityForecaster, LSTMConfig, NetworkArch
 from visuals.plot_surface import plot_vol_surface_plotly
 from visuals.heatmap_greeks import GreeksHeatmapGenerator
 from utils.data_cleaning import OptionsDataCleaner
+from app.components.opening_scanner_tab import render_opening_scanner_tab
 from engine.data.cache import MarketDataCache
 from engine.data.ticker import fetch_ticker_data as engine_fetch_ticker_data
 from engine.signals.swing import SwingSignalEngine
@@ -2835,10 +2836,11 @@ class RetroTerminal:
         self.render_header()
         
         # Enhanced Navigation with new advanced features
-        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
-            "MARKET SCANNER", 
-            "INDIVIDUAL ANALYSIS", 
-            "VOLATILITY SURFACE", 
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs([
+            "MARKET SCANNER",
+            "OPENING SCANNER",
+            "INDIVIDUAL ANALYSIS",
+            "VOLATILITY SURFACE",
             "ML FORECASTING",
             "RISK MANAGEMENT",
             "REGIME ANALYSIS",
@@ -2851,36 +2853,39 @@ class RetroTerminal:
             self.display_top_opportunities()
         
         with tab2:
-            self.display_individual_analysis()
+            render_opening_scanner_tab()
         
         with tab3:
-            self.display_volatility_surface()
+            self.display_individual_analysis()
         
         with tab4:
-            self.display_ml_forecasting()
+            self.display_volatility_surface()
         
         with tab5:
+            self.display_ml_forecasting()
+        
+        with tab6:
             if RISK_MODULES_AVAILABLE:
                 self.display_risk_management_dashboard()
             else:
                 st.error("❌ Risk management modules not available. Please check installation.")
         
-        with tab6:
+        with tab7:
             if REGIME_MODELS_AVAILABLE:
                 self.display_regime_analysis_dashboard()
             else:
                 st.error("❌ Regime analysis modules not available. Please check installation.")
         
-        with tab7:
+        with tab8:
             if BACKTESTING_AVAILABLE:
                 self.display_portfolio_backtest_dashboard()
             else:
                 st.error("❌ Backtesting modules not available. Please check installation.")
         
-        with tab8:
+        with tab9:
             self.display_monte_carlo_simulation()
         
-        with tab9:
+        with tab10:
             self.display_system_status()
 
     def display_volatility_surface(self):
