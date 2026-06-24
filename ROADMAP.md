@@ -16,7 +16,7 @@ IVSURF is pivoting from a broad quant demo to a **focused opening-hours volatili
 
 ## Near Term (v0.4)
 
-- [ ] Wire paper trader into Opening Scanner tab (explicit user confirmation)
+- [x] Wire paper trader into Opening Scanner tab (explicit user confirmation)
 - [ ] Scheduled pre-market scan (cron / GitHub Action)
 - [ ] Signal history dashboard with equity curve
 - [ ] Authentication on FastAPI routes

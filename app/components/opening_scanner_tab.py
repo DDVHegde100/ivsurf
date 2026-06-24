@@ -6,6 +6,7 @@ import streamlit as st
 import pandas as pd
 
 from engine.data.storage import DataStore
+from engine.execution.paper_trader import AlpacaPaperTrader
 from engine.signals.opening_scanner import scan_universe
 from engine.signals.regime_filter import RegimeFilter
 
@@ -99,6 +100,104 @@ def render_opening_scanner_tab() -> None:
             c2.metric("Score", f"{top['opening_score']:.0f}")
             c3.metric("Gap", f"{top.get('gap_pct', 0):+.2f}%")
             c4.metric("Regime", top.get("regime_label", "—"))
+
+        _render_paper_trading_panel(df)
+
+
+def _render_paper_trading_panel(results: pd.DataFrame) -> None:
+    """Optional Alpaca paper execution — requires explicit user confirmation."""
+    with st.expander("Paper Trading (Alpaca)", expanded=False):
+        st.caption(
+            "Submit market orders on your Alpaca paper account for the top ranked "
+            "signals. Orders are not placed until you confirm below."
+        )
+
+        trader_probe = AlpacaPaperTrader()
+        alpaca_ready = trader_probe.configured
+
+        if alpaca_ready:
+            st.success("Alpaca credentials detected.")
+        else:
+            st.info(
+                "No Alpaca credentials found — enable dry run to preview orders, "
+                "or set ALPACA_API_KEY and ALPACA_SECRET_KEY in your environment."
+            )
+
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            max_orders = st.number_input("Max orders", min_value=1, max_value=5, value=3)
+        with c2:
+            notional_usd = st.number_input(
+                "Notional per trade ($)", min_value=100, max_value=5000, value=500, step=100
+            )
+        with c3:
+            trade_min_score = st.slider("Min score to trade", 0, 100, 50)
+
+        dry_run = st.checkbox(
+            "Dry run (simulate orders, do not submit)",
+            value=not alpaca_ready,
+            disabled=not alpaca_ready,
+            help="When Alpaca is not configured, dry run is always used.",
+        )
+        if not alpaca_ready:
+            dry_run = True
+
+        if alpaca_ready and not dry_run:
+            try:
+                account = trader_probe.get_account()
+                st.metric("Buying power", f"${float(account.get('buying_power', 0)):,.0f}")
+            except Exception as exc:
+                st.error(f"Could not load Alpaca account: {exc}")
+
+        confirm = st.checkbox(
+            "I confirm I want to submit paper market orders for the top ranked signals",
+            value=False,
+        )
+
+        if st.button(
+            "Execute Top Signals",
+            type="secondary",
+            disabled=not confirm,
+            use_container_width=True,
+        ):
+            trader = AlpacaPaperTrader(dry_run=dry_run)
+            signals = results.to_dict(orient="records")
+            try:
+                with st.spinner("Submitting orders..."):
+                    placed = trader.execute_top_signals(
+                        signals,
+                        max_orders=int(max_orders),
+                        notional_usd=float(notional_usd),
+                        min_score=float(trade_min_score),
+                    )
+            except Exception as exc:
+                st.error(f"Order submission failed: {exc}")
+                return
+
+            if not placed:
+                st.warning("No signals met the trade minimum score or notional threshold.")
+                return
+
+            st.session_state["opening_paper_orders"] = placed
+            mode = "simulated" if dry_run else "submitted"
+            st.success(f"{len(placed)} order(s) {mode}.")
+
+        if "opening_paper_orders" in st.session_state:
+            rows = []
+            for item in st.session_state["opening_paper_orders"]:
+                signal = item["signal"]
+                order = item["order"]
+                rows.append(
+                    {
+                        "ticker": signal.get("ticker"),
+                        "score": signal.get("opening_score"),
+                        "side": order.get("side"),
+                        "qty": order.get("qty"),
+                        "status": order.get("status"),
+                        "order_id": order.get("id"),
+                    }
+                )
+            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
 
 def _format_scanner_df(df: pd.DataFrame) -> pd.DataFrame:
