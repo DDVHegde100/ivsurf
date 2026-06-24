@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import os
+from pathlib import Path
 from typing import Any
 
+import joblib
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import GradientBoostingClassifier
@@ -17,6 +20,8 @@ try:
     _HAS_XGB = True
 except ImportError:
     _HAS_XGB = False
+
+_DEFAULT_MODEL_PATH = Path("data/models/opening_ranker.joblib")
 
 
 DEFAULT_FEATURES = [
@@ -122,3 +127,46 @@ class OpeningMLRanker:
             train_window=train_window,
             test_window=test_window,
         )
+
+    def save(self, path: str | Path) -> Path:
+        """Persist fitted model, scaler, and metadata to disk."""
+        if not self._fitted or self.model is None:
+            raise ValueError("Model must be fitted before saving")
+        out = Path(path)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        joblib.dump(
+            {
+                "model": self.model,
+                "scaler": self.scaler,
+                "feature_cols": self.feature_cols,
+                "use_xgboost": self.use_xgboost,
+                "fitted": self._fitted,
+            },
+            out,
+        )
+        return out
+
+    @classmethod
+    def load(cls, path: str | Path) -> OpeningMLRanker:
+        """Load a persisted ranker."""
+        data = joblib.load(path)
+        ranker = cls(feature_cols=data["feature_cols"], use_xgboost=data["use_xgboost"])
+        ranker.model = data["model"]
+        ranker.scaler = data["scaler"]
+        ranker._fitted = data["fitted"]
+        return ranker
+
+
+def default_model_path() -> Path:
+    return Path(os.environ.get("IVSURF_MODEL_PATH", _DEFAULT_MODEL_PATH))
+
+
+def load_ranker_if_available(path: str | Path | None = None) -> OpeningMLRanker | None:
+    """Load the trained ranker when a model file exists."""
+    model_path = Path(path) if path else default_model_path()
+    if not model_path.exists():
+        return None
+    try:
+        return OpeningMLRanker.load(model_path)
+    except Exception:
+        return None

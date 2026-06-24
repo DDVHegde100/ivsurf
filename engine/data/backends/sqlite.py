@@ -163,3 +163,21 @@ class SQLiteBackend:
             rows = conn.execute(query, params).fetchall()
 
         return [dict(row) for row in rows]
+
+    def fetch_labeled_signals(
+        self,
+        horizon: str = "1h",
+        limit: int = 5000,
+    ) -> list[dict[str, Any]]:
+        query = """
+            SELECT s.id, s.ticker, s.signal_type, s.score, s.payload, s.created_at,
+                   o.horizon, o.realized_return, o.label AS outcome_label
+            FROM signals s
+            INNER JOIN outcomes o ON o.signal_id = s.id
+            WHERE o.horizon = ? AND o.realized_return IS NOT NULL
+            ORDER BY s.created_at ASC
+            LIMIT ?
+        """
+        with self.connect() as conn:
+            rows = conn.execute(query, (horizon, limit)).fetchall()
+        return [dict(row) for row in rows]

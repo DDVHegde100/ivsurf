@@ -8,6 +8,7 @@ import pandas as pd
 from engine.data.storage import DataStore
 from engine.execution.paper_trader import AlpacaPaperTrader
 from engine.signals.opening_scanner import scan_universe
+from engine.signals.ml_ranker import load_ranker_if_available
 from engine.signals.regime_filter import RegimeFilter
 
 
@@ -29,7 +30,7 @@ def render_opening_scanner_tab() -> None:
         unsafe_allow_html=True,
     )
 
-    col1, col2, col3 = st.columns([3, 1, 1])
+    col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
     with col1:
         tickers_raw = st.text_input(
             "Tickers (comma-separated)",
@@ -39,6 +40,14 @@ def render_opening_scanner_tab() -> None:
         min_score = st.slider("Min score", 0, 80, 20)
     with col3:
         use_regime = st.checkbox("Regime filter", value=True)
+    with col4:
+        ranker = load_ranker_if_available()
+        use_ml_rank = st.checkbox(
+            "ML re-rank",
+            value=bool(ranker),
+            disabled=ranker is None,
+            help="Requires a trained model at data/models/opening_ranker.joblib",
+        )
 
     if st.button("Run Opening Scan", type="primary", use_container_width=True):
         tickers = [t.strip().upper() for t in tickers_raw.split(",") if t.strip()]
@@ -53,6 +62,9 @@ def render_opening_scanner_tab() -> None:
         if results.empty:
             st.info("No tickers met the minimum score threshold.")
             return
+
+        if use_ml_rank and ranker is not None:
+            results = ranker.rank(results)
 
         st.session_state["opening_scan_results"] = results
 
@@ -76,6 +88,7 @@ def render_opening_scanner_tab() -> None:
             for c in [
                 "ticker",
                 "opening_score",
+                "ml_score",
                 "direction",
                 "price",
                 "gap_pct",
@@ -208,6 +221,8 @@ def _format_scanner_df(df: pd.DataFrame) -> pd.DataFrame:
         out["gap_pct"] = out["gap_pct"].map(lambda x: f"{x:+.2f}%")
     if "opening_score" in out.columns:
         out["opening_score"] = out["opening_score"].map(lambda x: f"{x:.0f}")
+    if "ml_score" in out.columns:
+        out["ml_score"] = out["ml_score"].map(lambda x: f"{x:.0f}")
     if "volatility" in out.columns:
         out["volatility"] = out["volatility"].map(lambda x: f"{x:.1%}")
     if "premarket_volume_ratio" in out.columns:

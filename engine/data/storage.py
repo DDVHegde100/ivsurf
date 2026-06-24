@@ -95,3 +95,11 @@ class DataStore:
     ) -> list[dict[str, Any]]:
         """Return signals joined with optional outcome rows, newest first."""
         return self._backend.fetch_signals_with_outcomes(limit=limit, signal_type=signal_type)
+
+    def fetch_labeled_signals(
+        self,
+        horizon: str = "1h",
+        limit: int = 5000,
+    ) -> list[dict[str, Any]]:
+        """Return signals with realized outcomes for ML training."""
+        return self._backend.fetch_labeled_signals(horizon=horizon, limit=limit)

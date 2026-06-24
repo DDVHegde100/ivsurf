@@ -76,6 +76,16 @@ uvicorn api.main:app --host 0.0.0.0 --port 8000
 
 Tables are created automatically on startup. When `IVSURF_DATABASE_URL` is unset, IVSURF uses SQLite at `IVSURF_DB_PATH` (default `data/ivsurf.db`).
 
+### ML ranker training
+
+After signals accumulate outcome labels in the database, retrain the opening ranker:
+
+```bash
+python scripts/train_ml_ranker.py --horizon 1h --min-samples 30
+```
+
+The model is saved to `data/models/opening_ranker.joblib` (override with `IVSURF_MODEL_PATH`). The Opening Scanner tab and `/predict` endpoint apply ML re-ranking when this file exists.
+
 ## Scheduled Pre-market Scan
 
 A GitHub Action runs the opening scanner on weekdays at **13:00 UTC** (~8:00 AM EST / 9:00 AM EDT):
