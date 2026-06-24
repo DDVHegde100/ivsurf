@@ -117,17 +117,17 @@ class PredictionBenchmark:
                             momentum_3d = (historical_data['Close'].iloc[-1] / historical_data['Close'].iloc[-4] - 1) * 100
                             momentum_5d = (historical_data['Close'].iloc[-1] / historical_data['Close'].iloc[-6] - 1) * 100
                             
-                            prediction_score = self.terminal.calculate_tomorrow_prediction(
+                            prediction_score = self.terminal.calculate_tomorrow_gain_prediction(
                                 historical_data, current_price, volatility, rsi, macd, bb_position,
                                 volume_trend, momentum_1d, momentum_3d, momentum_5d
                             )
                             
-                            advanced_pred = self.terminal.calculate_price_predictions(
+                            advanced_pred = self.terminal.calculate_tomorrow_gain_potential(
                                 historical_data, current_price, volatility, prediction_score
                             )
                             
-                            # Check accuracy
-                            if (advanced_pred['predicted_low'] <= actual_next_price <= advanced_pred['predicted_high']):
+                            # Check accuracy (price within conservative–aggressive target band)
+                            if (advanced_pred['conservative_target'] <= actual_next_price <= advanced_pred['aggressive_target']):
                                 results['advanced_algo']['correct'] += 1
                             results['advanced_algo']['total'] += 1
                             results['advanced_algo']['avg_confidence'].append(advanced_pred['confidence_level'])
@@ -223,12 +223,12 @@ class PredictionBenchmark:
         start_time = time.time()
         
         for _ in range(n_iterations):
-            prediction_score = self.terminal.calculate_tomorrow_prediction(
+            prediction_score = self.terminal.calculate_tomorrow_gain_prediction(
                 hist, current_price, volatility, rsi, macd, bb_position,
                 volume_trend, momentum_1d, momentum_3d, momentum_5d
             )
             
-            price_predictions = self.terminal.calculate_price_predictions(
+            price_predictions = self.terminal.calculate_tomorrow_gain_potential(
                 hist, current_price, volatility, prediction_score
             )
         
@@ -287,12 +287,12 @@ class PredictionBenchmark:
         
         for scenario in scenarios:
             try:
-                prediction_score = self.terminal.calculate_tomorrow_prediction(
+                prediction_score = self.terminal.calculate_tomorrow_gain_prediction(
                     synthetic_hist, 100, scenario["volatility"], scenario["rsi"], 
                     0.001, 0.5, 1.5, scenario["momentum"], scenario["momentum"], scenario["momentum"]
                 )
                 
-                price_predictions = self.terminal.calculate_price_predictions(
+                price_predictions = self.terminal.calculate_tomorrow_gain_potential(
                     synthetic_hist, 100, scenario["volatility"], prediction_score
                 )
                 

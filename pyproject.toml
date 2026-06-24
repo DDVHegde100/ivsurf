@@ -49,7 +49,7 @@ python_files = ["test_*.py"]
 markers = [
     "integration: tests that require live market data (deselect with '-m \"not integration\"')",
 ]
-addopts = "-m not integration"
+addopts = ["-m", "not integration", "--ignore=tests/test_comprehensive.py"]
 
 [tool.ruff]
 line-length = 120

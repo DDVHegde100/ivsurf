@@ -856,6 +856,7 @@ class RetroTerminal:
         
         # Initialize base score
         prediction_score = 0
+        kelly_score = 0
         
         # === CORE SWING TRADING SIGNALS ===
         
@@ -1062,6 +1063,10 @@ class RetroTerminal:
         gamma_exposure = min(np.random.beta(4, 6), 0.7)  # Simulate gamma exposure
         
         # Advanced composite scoring with 5 tiers of sophistication
+        ml_pattern_score = min(100, prediction_score)
+        fractal_score = fractal_efficiency * 10
+        volatility_enhancement = vol_score
+        total_bullish_score = prediction_score
         
         # Tier 1: Enhanced Technical + Volatility (40% weight)
         tier1_score = (
