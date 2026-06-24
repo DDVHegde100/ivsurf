@@ -7,6 +7,14 @@ import pandas as pd
 
 from engine.alerts.webhooks import dispatch_scan_alerts
 from engine.data.storage import DataStore
+from engine.data.universe import (
+    get_preset,
+    get_user_watchlist,
+    list_presets,
+    list_user_watchlists,
+    parse_ticker_list,
+    save_user_watchlist,
+)
 from engine.execution.paper_trader import AlpacaPaperTrader
 from engine.signals.opening_scanner import scan_universe
 from engine.signals.ml_ranker import load_ranker_if_available
@@ -14,10 +22,12 @@ from engine.signals.opening_options import enrich_scan_with_options, recommend_f
 from engine.signals.regime_filter import RegimeFilter
 
 
-DEFAULT_TICKERS = [
-    "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA", "META", "AMD",
-    "NFLX", "COIN", "PLTR", "SOFI", "RIVN", "LCID", "GME", "AMC",
-]
+def _universe_options() -> dict[str, str]:
+    options = {f"preset:{name}": desc for name, desc in list_presets().items()}
+    for name, count in list_user_watchlists().items():
+        options[f"user:{name}"] = f"My watchlist ({count} tickers)"
+    options["custom"] = "Custom ticker list"
+    return options
 
 
 def render_opening_scanner_tab() -> None:
@@ -32,12 +42,34 @@ def render_opening_scanner_tab() -> None:
         unsafe_allow_html=True,
     )
 
-    col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
-    with col1:
+    universe_options = _universe_options()
+    default_key = "preset:opening" if "preset:opening" in universe_options else next(iter(universe_options))
+
+    ucol1, ucol2 = st.columns([1, 2])
+    with ucol1:
+        selected_universe = st.selectbox(
+            "Universe",
+            options=list(universe_options.keys()),
+            format_func=lambda k: universe_options[k],
+            index=list(universe_options.keys()).index(default_key),
+        )
+    with ucol2:
+        if selected_universe == "custom":
+            default_tickers = ", ".join(get_preset("opening"))
+        elif selected_universe.startswith("preset:"):
+            default_tickers = ", ".join(get_preset(selected_universe.split(":", 1)[1]))
+        else:
+            default_tickers = ", ".join(get_user_watchlist(selected_universe.split(":", 1)[1]))
+
         tickers_raw = st.text_input(
             "Tickers (comma-separated)",
-            value=", ".join(DEFAULT_TICKERS[:12]),
+            value=default_tickers,
+            disabled=selected_universe != "custom",
         )
+
+    col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
+    with col1:
+        _render_watchlist_manager(parse_ticker_list(tickers_raw))
     with col2:
         min_score = st.slider("Min score", 0, 80, 20)
     with col3:
@@ -52,7 +84,12 @@ def render_opening_scanner_tab() -> None:
         )
 
     if st.button("Run Opening Scan", type="primary", use_container_width=True):
-        tickers = [t.strip().upper() for t in tickers_raw.split(",") if t.strip()]
+        if selected_universe == "custom":
+            tickers = parse_ticker_list(tickers_raw)
+        elif selected_universe.startswith("preset:"):
+            tickers = get_preset(selected_universe.split(":", 1)[1])
+        else:
+            tickers = get_user_watchlist(selected_universe.split(":", 1)[1])
         if not tickers:
             st.warning("Enter at least one ticker.")
             return
@@ -119,6 +156,20 @@ def render_opening_scanner_tab() -> None:
         _render_options_plays_panel(df)
         _render_alert_panel(df)
         _render_paper_trading_panel(df)
+
+
+def _render_watchlist_manager(current_tickers: list[str]) -> None:
+    with st.expander("Save watchlist", expanded=False):
+        name = st.text_input("Watchlist name", placeholder="my_momentum")
+        if st.button("Save current tickers", disabled=not current_tickers):
+            if not name.strip():
+                st.warning("Enter a watchlist name.")
+            else:
+                try:
+                    saved = save_user_watchlist(name, current_tickers)
+                    st.success(f"Saved {len(saved)} tickers to '{name}'.")
+                except Exception as exc:
+                    st.error(str(exc))
 
 
 def _render_alert_panel(results: pd.DataFrame) -> None:

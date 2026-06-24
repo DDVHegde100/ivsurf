@@ -1,0 +1,43 @@
+{
+  "presets": {
+    "core": {
+      "description": "Default pre-market and opening scan universe",
+      "tickers": [
+        "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA", "META", "AMD",
+        "NFLX", "COIN", "PLTR", "SOFI", "RIVN", "LCID", "GME", "AMC",
+        "SPY", "QQQ", "IWM", "BA", "JPM", "XOM", "DIS", "INTC"
+      ]
+    },
+    "opening": {
+      "description": "Liquid names for intraday opening scanner UI",
+      "tickers": [
+        "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA", "META", "AMD",
+        "NFLX", "COIN", "PLTR", "SOFI"
+      ]
+    },
+    "tech_mega": {
+      "description": "Mega-cap technology",
+      "tickers": ["AAPL", "MSFT", "GOOGL", "AMZN", "META", "NVDA", "TSLA", "AVGO", "ORCL", "CRM"]
+    },
+    "semis": {
+      "description": "Semiconductor sector",
+      "tickers": ["NVDA", "AMD", "INTC", "AVGO", "QCOM", "MU", "AMAT", "LRCX", "KLAC", "MRVL"]
+    },
+    "finance": {
+      "description": "Large banks and financials",
+      "tickers": ["JPM", "BAC", "WFC", "GS", "MS", "C", "BLK", "SCHW", "AXP", "V"]
+    },
+    "energy": {
+      "description": "Energy majors and explorers",
+      "tickers": ["XOM", "CVX", "COP", "SLB", "EOG", "OXY", "MPC", "PSX", "VLO", "HAL"]
+    },
+    "etfs": {
+      "description": "Major index and sector ETFs",
+      "tickers": ["SPY", "QQQ", "IWM", "DIA", "XLF", "XLK", "XLE", "XLV", "ARKK", "SMH"]
+    },
+    "high_beta": {
+      "description": "Higher-volatility retail favorites",
+      "tickers": ["TSLA", "NVDA", "AMD", "COIN", "PLTR", "SOFI", "RIVN", "LCID", "GME", "AMC", "MARA", "RIOT"]
+    }
+  }
+}

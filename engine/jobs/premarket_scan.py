@@ -9,19 +9,18 @@ from typing import Any
 
 from engine.data.sessions import ET, is_trading_day
 from engine.data.storage import DataStore
+from engine.data.universe import DEFAULT_UNIVERSE, resolve_universe
 from engine.signals.opening_scanner import scan_universe
 from engine.signals.regime_filter import RegimeFilter
 
-DEFAULT_UNIVERSE = [
-    "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA", "META", "AMD",
-    "NFLX", "COIN", "PLTR", "SOFI", "RIVN", "LCID", "GME", "AMC",
-    "SPY", "QQQ", "IWM", "BA", "JPM", "XOM", "DIS", "INTC",
-]
+# Re-export for backward compatibility
+__all__ = ["DEFAULT_UNIVERSE", "run_premarket_scan", "write_scan_report"]
 
 
 def run_premarket_scan(
     tickers: list[str] | None = None,
     *,
+    universe: str | None = None,
     min_score: float = 20.0,
     use_regime_filter: bool = True,
     persist: bool = True,
@@ -45,9 +44,9 @@ def run_premarket_scan(
             "signal_ids": [],
         }
 
-    universe = [t.strip().upper() for t in (tickers or DEFAULT_UNIVERSE) if t.strip()]
+    symbols = [t.strip().upper() for t in (tickers or resolve_universe(universe or "core")) if t.strip()]
     regime_filter = RegimeFilter() if use_regime_filter else None
-    df = scan_universe(universe, regime_filter=regime_filter, min_score=min_score)
+    df = scan_universe(symbols, regime_filter=regime_filter, min_score=min_score)
 
     results = df.to_dict(orient="records") if not df.empty else []
     signal_ids: list[int] = []
@@ -67,7 +66,7 @@ def run_premarket_scan(
     return {
         "skipped": False,
         "scanned_at": now.isoformat(),
-        "ticker_count": len(universe),
+        "ticker_count": len(symbols),
         "count": len(results),
         "results": results,
         "signal_ids": signal_ids,

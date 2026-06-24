@@ -117,6 +117,13 @@ python scripts/run_premarket_scan.py --force --output data/premarket_scan.json
 
 Use `--force` on weekends; omit it to skip non-trading days.
 
+Preset universes: `core`, `opening`, `tech_mega`, `semis`, `finance`, `energy`, `etfs`, `high_beta`.
+
+```bash
+python scripts/run_premarket_scan.py --universe semis --min-score 20
+python scripts/run_premarket_scan.py --universe user:my_watchlist
+```
+
 ## Docker
 
 If a `Dockerfile` is present in the repo root:

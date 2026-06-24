@@ -8,14 +8,20 @@ import json
 import sys
 
 from engine.alerts.webhooks import dispatch_scan_alerts
-from engine.jobs.premarket_scan import DEFAULT_UNIVERSE, run_premarket_scan, write_scan_report
+from engine.data.universe import DEFAULT_UNIVERSE, resolve_universe
+from engine.jobs.premarket_scan import run_premarket_scan, write_scan_report
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run IVSURF pre-market opening scan")
     parser.add_argument(
         "--tickers",
-        help="Comma-separated tickers (default: built-in universe)",
+        help="Comma-separated tickers (overrides --universe)",
+    )
+    parser.add_argument(
+        "--universe",
+        default="core",
+        help="Preset or user watchlist name (default: core)",
     )
     parser.add_argument("--min-score", type=float, default=20.0, help="Minimum opening score")
     parser.add_argument("--top-n", type=int, default=20, help="Max signals to persist")
@@ -50,13 +56,16 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     tickers = None
+    universe = args.universe
     if args.tickers:
         tickers = [t.strip().upper() for t in args.tickers.split(",") if t.strip()]
+        universe = None
     elif not args.tickers:
-        tickers = DEFAULT_UNIVERSE
+        tickers = None
 
     summary = run_premarket_scan(
         tickers,
+        universe=universe,
         min_score=args.min_score,
         use_regime_filter=not args.no_regime,
         persist=not args.no_persist,

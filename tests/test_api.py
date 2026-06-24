@@ -38,6 +38,24 @@ class TestAPI:
         body = resp.json()
         assert body["count"] == 0
 
+    def test_scan_with_universe_preset(self, client):
+        resp = client.post("/scan", json={"universe": "opening", "min_score": 99})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["universe"] == "opening"
+        assert body["ticker_count"] > 0
+
+    def test_list_universes(self, client):
+        resp = client.get("/universes")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert "core" in body["presets"]
+
+    def test_get_preset_universe(self, client):
+        resp = client.get("/universes/presets/tech_mega")
+        assert resp.status_code == 200
+        assert "NVDA" in resp.json()["tickers"]
+
     def test_signals_history_empty(self, client, tmp_path, monkeypatch):
         monkeypatch.setenv("IVSURF_DB_PATH", str(tmp_path / "test.db"))
         resp = client.get("/signals/history")

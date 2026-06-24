@@ -7,11 +7,8 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 import pytest
 
-from engine.jobs.premarket_scan import (
-    DEFAULT_UNIVERSE,
-    run_premarket_scan,
-    write_scan_report,
-)
+from engine.data.universe import DEFAULT_UNIVERSE
+from engine.jobs.premarket_scan import run_premarket_scan, write_scan_report
 
 ET = ZoneInfo("America/New_York")
 
