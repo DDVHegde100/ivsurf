@@ -1,300 +1,144 @@
-# IVSURF: Professional Volatility Surface Explorer
+# IVSURF
 
-Advanced options trading terminal with real-time volatility analysis, swing trading predictions, and quantitative finance modeling.
+Quantitative finance research platform for volatility surface analysis, swing signal scoring, and risk analytics. Built as an educational and research tool — not a live trading system.
 
 ![IVSURF Terminal](scripts/23.png)
 
-[![Launch Live Demo](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://ivsurf.streamlit.app)
-
-*Note: Live deployment link will be updated once the app is deployed*
-[![Deploy](https://img.shields.io/badge/Deploy-Streamlit_Cloud-FF6B6B.svg)](https://share.streamlit.io/)
+[![Launch Live Demo](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://ivsurf-volatility-explorer.streamlit.app)
 
 ## Live Demo
 
-**Try the IVSURF Terminal:** [https://ivsurf-volatility-explorer.streamlit.app](https://ivsurf-volatility-explorer.streamlit.app)
+[https://ivsurf-volatility-explorer.streamlit.app](https://ivsurf-volatility-explorer.streamlit.app)
 
-*Professional volatility surface modeling and swing trading analysis in your browser*
+## What It Does
 
-## Overview
+IVSURF combines classical quant finance with heuristic swing scoring in a Streamlit terminal:
 
-IVSURF implements institutional-grade quantitative finance models for derivatives pricing, risk management, and market analysis. The platform combines classical financial mathematics with modern machine learning techniques to provide comprehensive trading analytics.
+- **Market scanner** — ranks NASDAQ tickers by rule-based swing opportunity scores
+- **Volatility surfaces** — builds and visualizes IV surfaces from Yahoo Finance options chains
+- **Quant models** — GARCH, regime switching, Heston MC, VaR, Monte Carlo simulation
+- **ML forecasting** — sklearn ensemble volatility forecasting (TensorFlow LSTM optional)
+- **Risk analytics** — VaR, stress testing, regime-aware backtesting
 
-## Architecture
+**Data source:** Yahoo Finance (free, delayed, unofficial). No broker integration or order execution.
 
-```
-volatility_surface_explorer/
-├── core/                    # Core pricing models
-│   ├── black_scholes.py    # Black-Scholes-Merton implementation
-│   ├── greeks.py           # Option Greeks calculations
-│   ├── gaussian_process.py # Surface interpolation
-│   └── jump_models.py      # Jump-diffusion models
-├── models/                  # Advanced mathematical models
-│   ├── regime_switching.py # Markov regime-switching
-│   ├── garch.py            # GARCH volatility clustering
-│   └── volatility_clustering.py # Multi-scale clustering
-├── ml/                      # Machine learning models
-│   ├── neural_networks.py  # LSTM volatility forecasting
-│   └── volatility_forecasting.py # Ensemble methods
-├── risk/                    # Risk management
-│   ├── var_analysis.py     # Value-at-Risk calculations
-│   └── stress_testing.py   # Scenario analysis
-├── portfolio/               # Portfolio optimization
-│   └── regime_backtesting.py # Strategy backtesting
-├── scripts/                 # Trading interfaces
-│   └── ivsurf_retro_terminal.py # Main terminal
-├── visuals/                 # Visualization components
-│   └── plot_surface.py     # 3D volatility surfaces
-└── utils/                   # Data and utilities
-    └── fetch_data.py        # Market data integration
-```
+## Quick Start
 
-## Deployment Options
-
-### 🌐 **Streamlit Community Cloud (Recommended)**
-[![Deploy to Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io/ddhegde100/volatility_surface_explorer/main/scripts/ivsurf_retro_terminal.py)
-
-1. Fork this repository
-2. Go to [share.streamlit.io](https://share.streamlit.io/)
-3. Connect your GitHub account
-4. Select your forked repository
-5. Set main file: `scripts/ivsurf_retro_terminal.py`
-6. Deploy
-
-### ☁️ **Alternative Platforms**
-- **Railway.app**: Connect GitHub repo, automatic deployment
-- **Render.com**: Use included `render.yaml` configuration
-- **Heroku**: Use included `Procfile` (requires paid dyno)
-
-## Installation
-
-### Prerequisites
-- Python 3.9 or higher
-- Virtual environment (recommended)
-
-### Local Setup
 ```bash
-# Clone repository
 git clone https://github.com/DDVHegde100/volatility_surface_explorer.git
 cd volatility_surface_explorer
 
-# Create virtual environment
 python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+source .venv/bin/activate
 
-# Install dependencies
 pip install -r requirements.txt
-
-# Launch main terminal
 streamlit run scripts/ivsurf_retro_terminal.py --server.port 8503
 ```
 
-### Alternative Interfaces
+### Optional Dependencies
+
+Install extras via `pyproject.toml`:
+
 ```bash
-# Basic dashboard (options explorer)
-streamlit run dashboard/app.py --server.port 8500
+pip install -e ".[dev]"        # pytest, ruff
+pip install -e ".[ml]"           # TensorFlow for LSTM models
+pip install -e ".[quant]"        # arch, statsmodels for clustering diagnostics
+pip install -e ".[perf]"         # numba for Monte Carlo acceleration
+pip install -e ".[all]"          # everything
 ```
 
-## Mathematical Models
+## Project Structure
 
-### Core Pricing Models
-
-**Black-Scholes-Merton**
 ```
-C(S,t) = S₀e^(-qT)N(d₁) - Ke^(-rT)N(d₂)
-d₁ = [ln(S₀/K) + (r - q + σ²/2)T] / (σ√T)
+ivsurf/
+├── core/                    # Black-Scholes, Greeks, interpolation, GP smoothing
+├── models/                  # GARCH, regime switching, Heston, jump diffusion
+├── ml/                      # Volatility forecasting, neural networks
+├── risk/                    # VaR, stress testing
+├── portfolio/               # Regime-aware backtesting
+├── simulation/              # Monte Carlo, exotic options, correlation engine
+├── indicators/              # Technical analysis indicators
+├── visuals/                 # Plotly/matplotlib charting
+├── utils/                   # Yahoo Finance data fetcher
+├── scripts/
+│   └── ivsurf_retro_terminal.py   # Main Streamlit app
+├── dashboard/
+│   └── app.py               # Lightweight options explorer
+└── tests/                   # pytest suite
 ```
-European option pricing with dividend yield, vectorized for option chains.
-
-**Heston Stochastic Volatility**
-```
-dS_t = rS_t dt + √v_t S_t dW₁_t
-dv_t = κ(θ - v_t)dt + ξ√v_t dW₂_t
-```
-Stochastic volatility model with correlation between price and volatility processes.
-
-**Jump-Diffusion Models**
-```
-dS_t = (r - λk)S_t dt + σS_t dW_t + S_t ∫ e^x Ñ(dt,dx)
-```
-Merton and Kou models for incorporating market crashes and discontinuous movements.
-
-### Risk Management
-
-**Value-at-Risk (VaR)**
-- Historical simulation
-- Parametric (normal distribution)
-- Monte Carlo simulation
-- Expected Shortfall (CVaR)
-
-**GARCH Volatility Modeling**
-```
-σ²_t = ω + α·ε²_{t-1} + β·σ²_{t-1}
-```
-Volatility clustering analysis with EGARCH and GJR-GARCH variants.
-
-**Markov Regime-Switching**
-```
-P(s_{t+1} = j | s_t = i) = pᵢⱼ
-```
-Multi-state market environment modeling with EM algorithm estimation.
-
-### Machine Learning
-
-**LSTM Networks**
-Deep learning for volatility forecasting with attention mechanisms.
-
-**Gaussian Process**
-Non-parametric surface interpolation with uncertainty quantification.
-
-**Ensemble Methods**
-Multi-model combination for robust predictions across different market regimes.
-
-## Key Features
-
-### Trading Terminal
-- 9 comprehensive analysis tabs for market scanning and individual stock analysis
-- Real-time data integration with Yahoo Finance API
-- Interactive 3D volatility surface visualization
-- Professional terminal interface with real-time updates
-
-### Analytics Engine
-- Markov-switching models for market regime identification
-- ARCH/GARCH volatility clustering analysis with structural break detection
-- Complete option Greeks calculations (Delta, Gamma, Vega, Theta, Rho)
-- Jump detection algorithms for identifying market discontinuities
-- Exotic option pricing (Asian, Barrier, Lookback)
-
-### Risk Management
-- Multi-methodology VaR analysis (Historical, Parametric, Monte Carlo)
-- Comprehensive stress testing with scenario analysis
-- Portfolio optimization with regime-switching constraints
-- Dynamic hedging strategies based on Greeks
-- Backtesting framework for strategy validation
-
-### Machine Learning
-- LSTM neural networks for volatility forecasting
-- Ensemble methods combining multiple prediction models
-- Technical indicator feature engineering (50+ indicators)
-- Gaussian process interpolation for surface modeling
-- Regime classification using machine learning
-
-### Visualization
-- Interactive 3D volatility surfaces with Plotly
-- Real-time regime probability evolution charts
-- Dynamic correlation heatmaps
-- Comprehensive risk dashboard
-- Portfolio performance attribution analysis
 
 ## Usage Examples
 
-### Basic Option Pricing
+### Option Pricing
+
 ```python
 from core.black_scholes import black_scholes_price, implied_volatility
 from core.greeks import all_greeks
 
-# Price European call option
-call_price = black_scholes_price(
-    S=100, K=105, T=0.25, r=0.05, sigma=0.2, option_type='call'
-)
-
-# Calculate Greeks
+call_price = black_scholes_price(S=100, K=105, T=0.25, r=0.05, sigma=0.2, option_type='call')
 greeks = all_greeks(S=100, K=105, T=0.25, r=0.05, sigma=0.2, option_type='call')
-
-# Implied volatility calculation
 iv = implied_volatility(price=3.50, S=100, K=105, T=0.25, r=0.05, option_type='call')
 ```
 
-### Volatility Surface Modeling
-```python
-from visuals.plot_surface import plot_vol_surface_plotly
-from core.advanced_interpolation import AdvancedSurfaceInterpolator
+### Volatility Surface
 
-# Create volatility surface with Gaussian Process interpolation
+```python
+from core.advanced_interpolation import AdvancedSurfaceInterpolator
+from visuals.plot_surface import plot_vol_surface_plotly
+
 interpolator = AdvancedSurfaceInterpolator()
 smooth_surface = interpolator.interpolate_surface(surface_data, method='gaussian_process')
 fig = plot_vol_surface_plotly(smooth_surface)
 ```
 
 ### Risk Analysis
+
 ```python
 from risk.var_analysis import VaRAnalyzer
 
-# Calculate portfolio VaR
 var_analyzer = VaRAnalyzer()
 var_results = var_analyzer.calculate_portfolio_var(
-    portfolio_returns, 
+    portfolio_returns,
     confidence_levels=[0.95, 0.99],
-    methods=['historical', 'monte_carlo']
+    methods=['historical', 'monte_carlo'],
 )
 ```
 
-### Machine Learning Forecasting
-```python
-from ml.neural_networks import LSTMVolatilityForecaster
+## Testing
 
-# Train LSTM model for volatility prediction
-lstm_forecaster = LSTMVolatilityForecaster(config)
-lstm_forecaster.fit(X_train, y_train)
-forecast = lstm_forecaster.forecast(X_test)
+```bash
+pip install -r requirements-dev.txt
+pytest                          # unit tests (excludes integration by default)
+pytest -m integration           # live market data tests (requires network)
 ```
 
-## Testing and Validation
+## Deployment
 
-### Model Accuracy
-The platform includes comprehensive testing for model validation:
+Streamlit Community Cloud (recommended):
 
-- **Options Pricing**: <1% average error versus market prices
-- **VaR Backtesting**: 95.2% coverage ratio (Basel requirement: 95%±5%)
-- **Volatility Forecasting**: 15% RMSE improvement over GARCH baseline
-- **Regime Detection**: 85% classification accuracy on historical data
-- **Jump Detection**: 92% statistical power for identifying market discontinuities
+1. Fork this repository
+2. Go to [share.streamlit.io](https://share.streamlit.io/)
+3. Set main file: `scripts/ivsurf_retro_terminal.py`
+4. Deploy
 
-### Performance Benchmarks
-Computational efficiency compared to industry standards:
+See [DEPLOYMENT.md](DEPLOYMENT.md) for details. Docker, Render, and Fly.io configs are also included.
 
-| Operation | IVSURF Performance | Industry Benchmark |
-|-----------|-------------------|-------------------|
-| 20×10 Volatility Surface | <2 seconds | 5-10 seconds |
-| 1000 Option Chain Pricing | <0.5 seconds | 2-3 seconds |
-| VaR Calculation (252 days) | <1 second | 3-5 seconds |
-| LSTM Volatility Forecast | <5 seconds | 10-15 seconds |
+## Known Limitations
 
-### Risk Model Validation
-```python
-# VaR Backtesting Results (Kupiec Test)
-kupiec_statistic = -2 * log(L_restricted / L_unrestricted)
-p_value = 1 - chi2.cdf(kupiec_statistic, df=1)
-# Results: p_value = 0.64 (>0.05) → Model not rejected
-```
-
-## Dependencies
-
-Core scientific computing: NumPy, Pandas, SciPy  
-Financial modeling: yfinance, arch, statsmodels, QuantLib  
-Machine learning: scikit-learn, TensorFlow, Keras  
-Optimization: CVXPY, numba  
-Visualization: Streamlit, Plotly, matplotlib  
-
-Complete dependency list available in `requirements.txt`.
+- Swing scanner uses **heuristic scoring**, not trained ML models
+- Yahoo Finance data is delayed and may break without notice
+- TensorFlow, arch, statsmodels, and numba are optional — features degrade gracefully if missing
+- Rust performance module (`src/`) exists but is not wired to Python
+- No persistence, authentication, or live trading
 
 ## License
 
-MIT License - see LICENSE file for details.
+MIT License — see [LICENSE](LICENSE).
 
-## Disclaimers
+## Disclaimer
 
-This software is designed for educational and research purposes only. All financial models and trading strategies are provided for learning and demonstration. Not intended as investment advice. Users must consult qualified financial professionals before making investment decisions. All trading involves substantial risk of loss.
+This software is for **educational and research purposes only**. Not investment advice. All trading involves substantial risk of loss.
 
 ---
 
-Built for rapid prototyping and exploration of quantitative finance concepts. This project represents my transition back into systematic trading, focusing on implementing proven mathematical models for real-world applications.
-
-If you find this work valuable for your own quantitative finance journey, please consider starring the repository. Your support helps validate the effort invested in bridging academic theory with practical trading tools.
-
-**Dhruv Hegde**  
-*Quantitative Developer & Trading Systems Engineer*
-Machine learning: scikit-learn, TensorFlow, Keras
-Optimization: CVXPY, numba
-Visualization: Streamlit, Plotly, matplotlib
-
-Complete dependency list available in `requirements.txt`.
+**Dhruv Hegde** — Quantitative Developer & Trading Systems Engineer
