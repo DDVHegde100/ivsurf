@@ -19,7 +19,7 @@ IVSURF is pivoting from a broad quant demo to a **focused opening-hours volatili
 - [x] Wire paper trader into Opening Scanner tab (explicit user confirmation)
 - [x] Scheduled pre-market scan (cron / GitHub Action)
 - [x] Signal history dashboard with equity curve
-- [ ] Authentication on FastAPI routes
+- [x] Authentication on FastAPI routes
 - [ ] Postgres adapter for multi-user deployments
 
 ## Medium Term (v0.5)

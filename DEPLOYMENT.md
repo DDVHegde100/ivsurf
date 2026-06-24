@@ -48,8 +48,19 @@ Set the same Alpaca and database env vars as the Streamlit app.
 | `ALPACA_SECRET_KEY` | No | — | Alpaca secret |
 | `ALPACA_BASE_URL` | No | `https://paper-api.alpaca.markets` | Paper or live API base |
 | `IVSURF_DB_PATH` | No | `data/ivsurf.db` | SQLite database path |
+| `IVSURF_API_KEY` | No | — | When set, protected routes require `X-API-Key` header |
 
 Copy `.env.example` to `.env` for local development.
+
+### API authentication
+
+When `IVSURF_API_KEY` is set, `/scan`, `/predict`, and `/signals` require the header:
+
+```bash
+curl -H "X-API-Key: your-key" http://localhost:8000/signals/history
+```
+
+`/health` stays public and reports `"auth": "required"` or `"disabled"`. Leave `IVSURF_API_KEY` unset for local development without auth.
 
 ## Scheduled Pre-market Scan
 

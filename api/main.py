@@ -6,9 +6,10 @@ Run: uvicorn api.main:app --reload --port 8000
 
 from __future__ import annotations
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from api.auth import auth_enabled, require_api_key
 from api.routes import predict, scan, signals
 
 app = FastAPI(
@@ -24,11 +25,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(scan.router, prefix="/scan", tags=["scan"])
-app.include_router(predict.router, prefix="/predict", tags=["predict"])
-app.include_router(signals.router, prefix="/signals", tags=["signals"])
+_protected = [Depends(require_api_key)]
+
+app.include_router(scan.router, prefix="/scan", tags=["scan"], dependencies=_protected)
+app.include_router(predict.router, prefix="/predict", tags=["predict"], dependencies=_protected)
+app.include_router(signals.router, prefix="/signals", tags=["signals"], dependencies=_protected)
 
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "ivsurf-api"}
+    return {
+        "status": "ok",
+        "service": "ivsurf-api",
+        "auth": "required" if auth_enabled() else "disabled",
+    }
