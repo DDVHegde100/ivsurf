@@ -80,6 +80,7 @@ from visuals.plot_surface import plot_vol_surface_plotly
 from visuals.heatmap_greeks import GreeksHeatmapGenerator
 from utils.data_cleaning import OptionsDataCleaner
 from app.components.opening_scanner_tab import render_opening_scanner_tab
+from app.components.performance_dashboard import render_performance_dashboard
 from engine.data.cache import MarketDataCache
 from engine.data.ticker import fetch_ticker_data as engine_fetch_ticker_data
 from engine.signals.swing import SwingSignalEngine
@@ -2836,7 +2837,7 @@ class RetroTerminal:
         self.render_header()
         
         # Enhanced Navigation with new advanced features
-        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs([
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11 = st.tabs([
             "MARKET SCANNER",
             "OPENING SCANNER",
             "INDIVIDUAL ANALYSIS",
@@ -2846,6 +2847,7 @@ class RetroTerminal:
             "REGIME ANALYSIS",
             "PORTFOLIO BACKTEST",
             "MONTE CARLO SIM",
+            "SIGNAL PERFORMANCE",
             "SYSTEM STATUS"
         ])
         
@@ -2886,6 +2888,9 @@ class RetroTerminal:
             self.display_monte_carlo_simulation()
         
         with tab10:
+            render_performance_dashboard()
+        
+        with tab11:
             self.display_system_status()
 
     def display_volatility_surface(self):
