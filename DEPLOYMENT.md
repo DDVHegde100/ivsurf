@@ -35,6 +35,7 @@ Endpoints:
 |--------|------|-------------|
 | GET | `/health` | Health check |
 | POST | `/scan` | Run opening scanner on ticker list |
+| WS | `/ws/opening-range` | Live opening-range snapshots (see below) |
 | GET | `/predict/{ticker}` | Single-ticker scan + ML rank |
 | GET | `/signals/history` | Stored signal history from SQLite |
 
@@ -63,6 +64,22 @@ curl -H "X-API-Key: your-key" http://localhost:8000/signals/history
 ```
 
 `/health` stays public and reports `"auth": "required"` or `"disabled"`. Leave `IVSURF_API_KEY` unset for local development without auth.
+
+WebSocket clients pass the same key as a query parameter:
+
+```bash
+websocat "ws://localhost:8000/ws/opening-range?api_key=your-key"
+```
+
+### Opening range websocket
+
+Subscribe after connecting:
+
+```json
+{"action": "subscribe", "tickers": ["AAPL", "NVDA"], "interval_sec": 30}
+```
+
+The server responds with `subscribed`, then periodic `update` messages containing 5m/15m/30m opening-range high, low, range %, volume, and breakout status. Default poll interval is controlled by `IVSURF_OR_FEED_INTERVAL_SEC` (30 seconds).
 
 ### PostgreSQL storage
 

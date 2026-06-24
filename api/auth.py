@@ -18,6 +18,15 @@ def auth_enabled() -> bool:
     return configured_api_key() is not None
 
 
+def verify_ws_api_key(api_key: str | None) -> None:
+    """Validate API key for WebSocket connections (query param)."""
+    expected = configured_api_key()
+    if expected is None:
+        return
+    if not api_key or not secrets.compare_digest(api_key, expected):
+        raise PermissionError("Invalid or missing API key")
+
+
 def require_api_key(x_api_key: str | None = Header(default=None, alias="X-API-Key")) -> None:
     """
     Enforce X-API-Key header when IVSURF_API_KEY is set.
