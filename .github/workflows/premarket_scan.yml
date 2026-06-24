@@ -40,6 +40,9 @@ jobs:
           ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
           ALPACA_BASE_URL: ${{ secrets.ALPACA_BASE_URL }}
           IVSURF_DB_PATH: data/ivsurf.db
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          IVSURF_ALERT_MIN_SCORE: ${{ vars.IVSURF_ALERT_MIN_SCORE || '50' }}
         run: |
           FORCE_FLAG=""
           if [ "${{ github.event.inputs.force }}" = "true" ]; then
@@ -49,6 +52,7 @@ jobs:
           python scripts/run_premarket_scan.py \
             --min-score "$MIN_SCORE" \
             --output data/premarket_scan.json \
+            --alert \
             $FORCE_FLAG
 
       - name: Upload scan report

@@ -7,6 +7,7 @@ import argparse
 import json
 import sys
 
+from engine.alerts.webhooks import dispatch_scan_alerts
 from engine.jobs.premarket_scan import DEFAULT_UNIVERSE, run_premarket_scan, write_scan_report
 
 
@@ -30,6 +31,22 @@ def main(argv: list[str] | None = None) -> int:
         default="data/premarket_scan.json",
         help="Path for JSON report (default: data/premarket_scan.json)",
     )
+    parser.add_argument(
+        "--alert",
+        action="store_true",
+        help="Send Slack/Discord webhook alert for hits above alert threshold",
+    )
+    parser.add_argument(
+        "--alert-threshold",
+        type=float,
+        default=None,
+        help="Minimum score for webhook alert (default: IVSURF_ALERT_MIN_SCORE or 50)",
+    )
+    parser.add_argument(
+        "--alert-dry-run",
+        action="store_true",
+        help="Build alert payloads without POSTing to webhooks",
+    )
     args = parser.parse_args(argv)
 
     tickers = None
@@ -48,6 +65,14 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     write_scan_report(summary, args.output)
+
+    if args.alert and not summary.get("skipped"):
+        alert_result = dispatch_scan_alerts(
+            summary,
+            min_alert_score=args.alert_threshold,
+            dry_run=args.alert_dry_run,
+        )
+        print(json.dumps({"alerts": alert_result}, indent=2, default=str))
 
     if summary.get("skipped"):
         print(json.dumps(summary, indent=2))

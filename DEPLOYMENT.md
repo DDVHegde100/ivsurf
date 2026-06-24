@@ -86,6 +86,20 @@ python scripts/train_ml_ranker.py --horizon 1h --min-samples 30
 
 The model is saved to `data/models/opening_ranker.joblib` (override with `IVSURF_MODEL_PATH`). The Opening Scanner tab and `/predict` endpoint apply ML re-ranking when this file exists.
 
+### Webhook alerts
+
+Notify Slack or Discord when scan hits exceed a score threshold:
+
+```bash
+export SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+export DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
+export IVSURF_ALERT_MIN_SCORE=50
+
+python scripts/run_premarket_scan.py --alert --alert-threshold 50
+```
+
+The pre-market GitHub Action passes `--alert` automatically when webhook secrets are configured. Use `--alert-dry-run` to preview payloads locally.
+
 ## Scheduled Pre-market Scan
 
 A GitHub Action runs the opening scanner on weekdays at **13:00 UTC** (~8:00 AM EST / 9:00 AM EDT):

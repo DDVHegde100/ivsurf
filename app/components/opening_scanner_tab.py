@@ -5,6 +5,7 @@ from __future__ import annotations
 import streamlit as st
 import pandas as pd
 
+from engine.alerts.webhooks import dispatch_scan_alerts
 from engine.data.storage import DataStore
 from engine.execution.paper_trader import AlpacaPaperTrader
 from engine.signals.opening_scanner import scan_universe
@@ -116,7 +117,37 @@ def render_opening_scanner_tab() -> None:
             c4.metric("Regime", top.get("regime_label", "—"))
 
         _render_options_plays_panel(df)
+        _render_alert_panel(df)
         _render_paper_trading_panel(df)
+
+
+def _render_alert_panel(results: pd.DataFrame) -> None:
+    """Optional Slack/Discord webhook alert for high-scoring hits."""
+    with st.expander("Webhook Alerts (Slack / Discord)", expanded=False):
+        st.caption(
+            "Send an alert when scan hits exceed a score threshold. "
+            "Set SLACK_WEBHOOK_URL and/or DISCORD_WEBHOOK_URL in the environment."
+        )
+        threshold = st.number_input("Alert min score", min_value=0, max_value=100, value=50, step=5)
+        dry_run = st.checkbox("Dry run (preview payload only)", value=True)
+
+        if st.button("Send webhook alert", use_container_width=True):
+            summary = {
+                "scanned_at": pd.Timestamp.now(tz="America/New_York").isoformat(),
+                "results": results.to_dict(orient="records"),
+            }
+            try:
+                result = dispatch_scan_alerts(summary, min_alert_score=float(threshold), dry_run=dry_run)
+                if result.get("skipped"):
+                    st.warning(f"Alert skipped: {result.get('reason', 'unknown')}")
+                else:
+                    st.success(
+                        f"Alert dispatched for {result.get('hit_count', 0)} hit(s) "
+                        f"≥ {result.get('threshold', threshold):.0f}"
+                    )
+                st.json(result)
+            except Exception as exc:
+                st.error(f"Alert failed: {exc}")
 
 
 def _render_options_plays_panel(results: pd.DataFrame) -> None:
