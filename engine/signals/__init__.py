@@ -1,3 +1,5 @@
 """Trading signal generators."""
 
-__all__: list[str] = []
+from engine.signals.swing import SwingSignalEngine
+
+__all__ = ["SwingSignalEngine"]
