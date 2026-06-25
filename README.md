@@ -14,6 +14,7 @@ Quantitative finance research platform for volatility surface analysis, swing si
 
 IVSURF combines classical quant finance with opening-hours volatility scanning in a Streamlit terminal:
 
+- **3D Spatial Lab** — parametric math surfaces, ML loss landscapes, PCA feature space, knowledge graphs, correlation sphere, opening score terrain
 - **Opening scanner** — ranks tickers by gap, premarket volume, opening range, and regime-adjusted scores
 - **Market scanner** — ranks NASDAQ tickers by rule-based swing opportunity scores
 - **Volatility surfaces** — builds and visualizes IV surfaces from Yahoo Finance options chains

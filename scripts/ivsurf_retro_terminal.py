@@ -81,6 +81,7 @@ from visuals.heatmap_greeks import GreeksHeatmapGenerator
 from utils.data_cleaning import OptionsDataCleaner
 from app.ui import load_css
 from app.components.opening_scanner_tab import render_opening_scanner_tab
+from app.components.spatial_lab_tab import render_spatial_lab_tab
 from app.components.performance_dashboard import render_performance_dashboard
 from engine.data.cache import MarketDataCache
 from engine.data.ticker import fetch_ticker_data as engine_fetch_ticker_data
@@ -2839,15 +2840,16 @@ class RetroTerminal:
         with st.sidebar:
             st.markdown("### IVSURF")
             theme = st.radio("Theme", ["Retro", "Modern"], index=0, horizontal=True)
-            st.caption("v0.3 — Opening scanner enabled")
+            st.caption("v1.0 — 3D Spatial Lab enabled")
 
         load_css(theme.lower())
         self.render_header()
         
         # Enhanced Navigation with new advanced features
-        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11 = st.tabs([
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11, tab12 = st.tabs([
             "MARKET SCANNER",
             "OPENING SCANNER",
+            "3D SPATIAL LAB",
             "INDIVIDUAL ANALYSIS",
             "VOLATILITY SURFACE",
             "ML FORECASTING",
@@ -2866,39 +2868,42 @@ class RetroTerminal:
             render_opening_scanner_tab()
         
         with tab3:
-            self.display_individual_analysis()
+            render_spatial_lab_tab()
         
         with tab4:
-            self.display_volatility_surface()
+            self.display_individual_analysis()
         
         with tab5:
-            self.display_ml_forecasting()
+            self.display_volatility_surface()
         
         with tab6:
+            self.display_ml_forecasting()
+        
+        with tab7:
             if RISK_MODULES_AVAILABLE:
                 self.display_risk_management_dashboard()
             else:
                 st.error("❌ Risk management modules not available. Please check installation.")
         
-        with tab7:
+        with tab8:
             if REGIME_MODELS_AVAILABLE:
                 self.display_regime_analysis_dashboard()
             else:
                 st.error("❌ Regime analysis modules not available. Please check installation.")
         
-        with tab8:
+        with tab9:
             if BACKTESTING_AVAILABLE:
                 self.display_portfolio_backtest_dashboard()
             else:
                 st.error("❌ Backtesting modules not available. Please check installation.")
         
-        with tab9:
+        with tab10:
             self.display_monte_carlo_simulation()
         
-        with tab10:
+        with tab11:
             render_performance_dashboard()
         
-        with tab11:
+        with tab12:
             self.display_system_status()
 
     def display_volatility_surface(self):

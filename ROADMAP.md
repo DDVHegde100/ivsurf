@@ -45,6 +45,7 @@ IVSURF is pivoting from a broad quant demo to a **focused opening-hours volatili
 
 - [x] NYSE holiday calendar for session and pre-market scan scheduling
 - [x] Streamlit live opening range monitor (Opening Scanner tab)
+- [x] 3D Spatial Lab (math surfaces, ML graphs, knowledge maps)
 - [ ] Docker Compose one-command deploy (Streamlit + API)
 - [ ] OpenPulse product rebrand
 
