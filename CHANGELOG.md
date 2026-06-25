@@ -2,6 +2,17 @@
 
 All notable changes to OpenPulse (formerly IVSURF) are documented here.
 
+## [1.2.0] - 2026-06-24
+
+### Added
+
+- Animated 3D surfaces (ripple, Lissajous, breathing sphere)
+- 3D neural network architecture graph
+- Portfolio risk ellipsoid and IV smile surface
+- Fourier spectral surface, price path ribbons, Monte Carlo path cloud
+- HTML export for interactive 3D Plotly figures
+- Expanded Spatial Lab with 7 sub-tabs
+
 ## [1.1.0] - 2026-06-24
 
 ### Added
@@ -38,5 +49,6 @@ First stable release of the opening-hours volatility scanner platform.
 
 - 141+ unit tests; CI on Python 3.9 and 3.11
 
+[1.2.0]: https://github.com/DDVHegde100/ivsurf/releases/tag/v1.2.0
 [1.1.0]: https://github.com/DDVHegde100/ivsurf/releases/tag/v1.1.0
 [1.0.0]: https://github.com/DDVHegde100/ivsurf/releases/tag/v1.0.0

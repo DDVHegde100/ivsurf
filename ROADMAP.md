@@ -49,6 +49,14 @@
 - [x] Docker Compose one-command deploy (Streamlit + API)
 - [x] OpenPulse product rebrand
 
+## v1.2 — Advanced 3D Analytics
+
+- [x] Animated parametric surfaces
+- [x] 3D neural network architecture graph
+- [x] Portfolio risk ellipsoid & IV smile surface
+- [x] Fourier spectral, price ribbon, Monte Carlo path cloud
+- [x] HTML export for 3D Plotly figures
+
 ## Non-Goals
 
 - Replacing Bloomberg or institutional OMS systems
