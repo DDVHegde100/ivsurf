@@ -17,7 +17,7 @@ for arg in "$@"; do
   fi
 done
 
-echo "Building and starting IVSURF containers..."
+echo "Building and starting OpenPulse containers..."
 if $USE_POSTGRES; then
   docker compose -f docker-compose.yml -f docker-compose.postgres.yml up -d --build
 else
@@ -25,7 +25,7 @@ else
 fi
 
 echo ""
-echo "IVSURF is running:"
+echo "OpenPulse is running:"
 echo "  UI:  http://localhost:${IVSURF_UI_PORT:-8501}"
 echo "  API: http://localhost:${IVSURF_API_PORT:-8000}/health"
 echo ""

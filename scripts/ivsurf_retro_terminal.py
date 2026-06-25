@@ -1,13 +1,10 @@
 #!/usr/bin/env python3
 """
-IVSURF PROFESSIONAL TRADING TERMINAL v5.0
-==========================================
+OpenPulse Terminal (formerly IVSURF)
+====================================
 
-Classic 1996-Era Investment Banking Terminal
-Authentic retro computer aesthetics with modern functionality
-
-Author: IVSURF Systems
-Date: August 16, 2025
+Opening-hours volatility scanner with 3D spatial research lab,
+classic retro terminal aesthetics, and modern quant tooling.
 """
 
 import streamlit as st
@@ -80,6 +77,7 @@ from visuals.plot_surface import plot_vol_surface_plotly
 from visuals.heatmap_greeks import GreeksHeatmapGenerator
 from utils.data_cleaning import OptionsDataCleaner
 from app.ui import load_css
+from app.brand import LEGACY_NAME, PRODUCT_NAME, PRODUCT_TAGLINE, TERMINAL_TITLE, TERMINAL_VERSION
 from app.components.opening_scanner_tab import render_opening_scanner_tab
 from app.components.spatial_lab_tab import render_spatial_lab_tab
 from app.components.performance_dashboard import render_performance_dashboard
@@ -171,8 +169,8 @@ class RetroTerminal:
     def set_page_config(self):
         """Configure page with retro styling"""
         st.set_page_config(
-            page_title="IVSURF PROFESSIONAL TERMINAL v5.0",
-            page_icon="[I]",
+            page_title=f"{TERMINAL_TITLE} v{TERMINAL_VERSION}",
+            page_icon="⚡",
             layout="wide",
             initial_sidebar_state="collapsed"
         )
@@ -666,13 +664,13 @@ class RetroTerminal:
 
     def render_header(self):
         """Render enhanced professional terminal header"""
-        st.markdown("""
+        st.markdown(f"""
         <div class="terminal-header">
             <div class="terminal-title">
-                ▲ IVSURF PROFESSIONAL TERMINAL v5.0 ▲
+                ▲ {TERMINAL_TITLE.upper()} v{TERMINAL_VERSION} ▲
             </div>
             <div class="terminal-subtitle">
-                █ INTEGRATED VOLATILITY SURFACE RESEARCH FACILITY █
+                █ {PRODUCT_TAGLINE.upper()} █
             </div>
             <div style="display: flex; justify-content: center; gap: 30px; margin: 15px 0; font-size: 14px; color: #66ff66;">
                 <span class="glow-green">● SYSTEM ONLINE</span>
@@ -683,7 +681,7 @@ class RetroTerminal:
                 ┌─ NASDAQ SCANNING ENGINE LOADED ─┐
             </div>
             <div class="terminal-version">
-                COPYRIGHT 1996-2025 IVSURF SYSTEMS INC. | AUTHORIZED USERS ONLY
+                COPYRIGHT 1996-2026 {PRODUCT_NAME.upper()} / {LEGACY_NAME} | AUTHORIZED USERS ONLY
             </div>
         </div>
         
@@ -2838,9 +2836,9 @@ class RetroTerminal:
         self.set_page_config()
 
         with st.sidebar:
-            st.markdown("### IVSURF")
+            st.markdown(f"### {PRODUCT_NAME}")
             theme = st.radio("Theme", ["Retro", "Modern"], index=0, horizontal=True)
-            st.caption("v1.0 — 3D Spatial Lab enabled")
+            st.caption(f"v{TERMINAL_VERSION} — {PRODUCT_TAGLINE}")
 
         load_css(theme.lower())
         self.render_header()

@@ -1,5 +1,5 @@
 """
-IVSURF FastAPI backend.
+OpenPulse FastAPI backend (IVSURF-compatible env vars).
 
 Run: uvicorn api.main:app --reload --port 8000
 """
@@ -9,13 +9,14 @@ from __future__ import annotations
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.brand import API_TITLE, PRODUCT_NAME, PRODUCT_TAGLINE
 from api.auth import auth_enabled, require_api_key
 from api.routes import opening_range_ws, predict, scan, signals, universes
 
 app = FastAPI(
-    title="IVSURF API",
-    description="Opening scanner and signal research API",
-    version="1.0.0",
+    title=API_TITLE,
+    description=PRODUCT_TAGLINE,
+    version="1.1.0",
 )
 
 app.add_middleware(
@@ -38,6 +39,8 @@ app.include_router(opening_range_ws.router, prefix="/ws", tags=["websocket"])
 def health():
     return {
         "status": "ok",
-        "service": "ivsurf-api",
+        "service": "openpulse-api",
+        "product": PRODUCT_NAME,
+        "legacy_service": "ivsurf-api",
         "auth": "required" if auth_enabled() else "disabled",
     }

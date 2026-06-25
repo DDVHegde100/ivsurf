@@ -1,6 +1,6 @@
 # Roadmap
 
-IVSURF is pivoting from a broad quant demo to a **focused opening-hours volatility scanner** with walk-forward validation and optional paper trading.
+**OpenPulse** (formerly IVSURF) is a focused opening-hours volatility scanner with 3D spatial analytics, walk-forward validation, and optional paper trading.
 
 ## Completed (v0.3)
 
@@ -47,7 +47,7 @@ IVSURF is pivoting from a broad quant demo to a **focused opening-hours volatili
 - [x] Streamlit live opening range monitor (Opening Scanner tab)
 - [x] 3D Spatial Lab (math surfaces, ML graphs, knowledge maps)
 - [x] Docker Compose one-command deploy (Streamlit + API)
-- [ ] OpenPulse product rebrand
+- [x] OpenPulse product rebrand
 
 ## Non-Goals
 

@@ -1,6 +1,18 @@
 # Changelog
 
-All notable changes to IVSURF are documented here.
+All notable changes to OpenPulse (formerly IVSURF) are documented here.
+
+## [1.1.0] - 2026-06-24
+
+### Added
+
+- 3D Spatial Lab — math surfaces, ML graphs, knowledge maps, correlation sphere
+- Docker Compose one-command deploy (Streamlit UI + FastAPI + optional Postgres)
+
+### Changed
+
+- Product rebrand from IVSURF to **OpenPulse** (UI, API, docs)
+- `IVSURF_*` environment variables retained for backward compatibility
 
 ## [1.0.0] - 2026-06-24
 
@@ -26,4 +38,5 @@ First stable release of the opening-hours volatility scanner platform.
 
 - 141+ unit tests; CI on Python 3.9 and 3.11
 
+[1.1.0]: https://github.com/DDVHegde100/ivsurf/releases/tag/v1.1.0
 [1.0.0]: https://github.com/DDVHegde100/ivsurf/releases/tag/v1.0.0

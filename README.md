@@ -1,8 +1,10 @@
-# IVSURF
+# OpenPulse
 
-Quantitative finance research platform for volatility surface analysis, swing signal scoring, and risk analytics. Built as an educational and research tool — not a live trading system.
+**OpenPulse** is an opening-hours volatility scanner and spatial research platform — 3D math visualizations, ML graphs, knowledge maps, and optional paper trading. Built as an educational and research tool, not a live trading system.
 
-![IVSURF Terminal](scripts/23.png)
+Formerly **IVSURF** (Integrated Volatility Surface Research Facility). The GitHub repo remains `ivsurf`; environment variables keep the `IVSURF_*` prefix for compatibility.
+
+![OpenPulse Terminal](scripts/23.png)
 
 [![Launch Live Demo](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://ivsurf-volatility-explorer.streamlit.app)
 
@@ -12,7 +14,7 @@ Quantitative finance research platform for volatility surface analysis, swing si
 
 ## What It Does
 
-IVSURF combines classical quant finance with opening-hours volatility scanning in a Streamlit terminal:
+OpenPulse combines opening-hours scanning, 3D spatial analytics, and classical quant finance in a Streamlit terminal:
 
 - **3D Spatial Lab** — parametric math surfaces, ML loss landscapes, PCA feature space, knowledge graphs, correlation sphere, opening score terrain
 - **Opening scanner** — ranks tickers by gap, premarket volume, opening range, and regime-adjusted scores
@@ -41,6 +43,9 @@ streamlit run scripts/ivsurf_retro_terminal.py --server.port 8503
 # Optional: REST API
 pip install -e ".[api]"
 uvicorn api.main:app --reload --port 8000
+
+# Docker (UI + API)
+./scripts/compose-up.sh
 ```
 
 ### Optional Dependencies
@@ -60,58 +65,15 @@ pip install -e ".[all]"          # everything
 ```
 ivsurf/
 ├── engine/                  # Business logic (data, features, signals, backtest, execution)
-├── api/                     # FastAPI routes
+├── api/                     # FastAPI routes (OpenPulse API)
 ├── app/                     # Streamlit UI components and themes
-├── core/                    # Black-Scholes, Greeks, interpolation, GP smoothing
+├── core/                    # Black-Scholes, Greeks, spatial geometry
+├── visuals/plot_3d/         # 3D Plotly visualizations
 ├── models/                  # GARCH, regime switching, Heston, jump diffusion
 ├── ml/                      # Volatility forecasting, neural networks
-├── risk/                    # VaR, stress testing
-├── portfolio/               # Regime-aware backtesting
-├── simulation/              # Monte Carlo, exotic options, correlation engine
-├── indicators/              # Technical analysis indicators
-├── visuals/                 # Plotly/matplotlib charting
-├── utils/                   # Yahoo Finance data fetcher
 ├── scripts/
 │   └── ivsurf_retro_terminal.py   # Main Streamlit app
-├── docs/                    # Architecture and design docs
 └── tests/                   # pytest suite
-```
-
-## Usage Examples
-
-### Option Pricing
-
-```python
-from core.black_scholes import black_scholes_price, implied_volatility
-from core.greeks import all_greeks
-
-call_price = black_scholes_price(S=100, K=105, T=0.25, r=0.05, sigma=0.2, option_type='call')
-greeks = all_greeks(S=100, K=105, T=0.25, r=0.05, sigma=0.2, option_type='call')
-iv = implied_volatility(price=3.50, S=100, K=105, T=0.25, r=0.05, option_type='call')
-```
-
-### Volatility Surface
-
-```python
-from core.advanced_interpolation import AdvancedSurfaceInterpolator
-from visuals.plot_surface import plot_vol_surface_plotly
-
-interpolator = AdvancedSurfaceInterpolator()
-smooth_surface = interpolator.interpolate_surface(surface_data, method='gaussian_process')
-fig = plot_vol_surface_plotly(smooth_surface)
-```
-
-### Risk Analysis
-
-```python
-from risk.var_analysis import VaRAnalyzer
-
-var_analyzer = VaRAnalyzer()
-var_results = var_analyzer.calculate_portfolio_var(
-    portfolio_returns,
-    confidence_levels=[0.95, 0.99],
-    methods=['historical', 'monte_carlo'],
-)
 ```
 
 ## Testing
@@ -120,31 +82,20 @@ var_results = var_analyzer.calculate_portfolio_var(
 pip install -r requirements-dev.txt
 pytest                          # unit tests (excludes integration by default)
 pytest -m integration           # live market data tests (requires network)
-
-# Docker (UI + API)
-./scripts/compose-up.sh
 ```
 
 ## Deployment
 
-Streamlit Community Cloud (recommended):
-
-1. Fork this repository
-2. Go to [share.streamlit.io](https://share.streamlit.io/)
-3. Set main file: `scripts/ivsurf_retro_terminal.py`
-4. Deploy
-
-See [DEPLOYMENT.md](DEPLOYMENT.md) for Streamlit Cloud, FastAPI, and Alpaca setup. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for system design.
+See [DEPLOYMENT.md](DEPLOYMENT.md) for Streamlit Cloud, Docker Compose, FastAPI, and Alpaca setup.
 
 ## Known Limitations
 
 - Opening scanner uses **heuristic scoring** with optional ML re-ranking when a trained model is present
 - Yahoo Finance data is delayed and may break without notice; Alpaca recommended for intraday bars
-- TensorFlow, arch, statsmodels, and numba are optional — features degrade gracefully if missing
 - Live order submission requires explicit user confirmation; guardrails are enabled by default
 - Not investment advice — research and educational use only
 
-See [CHANGELOG.md](CHANGELOG.md) for release history and [DEPLOYMENT.md](DEPLOYMENT.md) for the v1.0 production checklist.
+See [CHANGELOG.md](CHANGELOG.md) for release history.
 
 ## License
 
