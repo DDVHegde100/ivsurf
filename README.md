@@ -120,6 +120,9 @@ var_results = var_analyzer.calculate_portfolio_var(
 pip install -r requirements-dev.txt
 pytest                          # unit tests (excludes integration by default)
 pytest -m integration           # live market data tests (requires network)
+
+# Docker (UI + API)
+./scripts/compose-up.sh
 ```
 
 ## Deployment

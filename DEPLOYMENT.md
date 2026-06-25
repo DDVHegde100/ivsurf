@@ -174,11 +174,38 @@ python scripts/run_premarket_scan.py --universe user:my_watchlist
 
 ## Docker
 
-If a `Dockerfile` is present in the repo root:
+One-command deploy (Streamlit UI + FastAPI):
 
 ```bash
-docker build -t ivsurf .
-docker run -p 8503:8503 -e ALPACA_API_KEY=... ivsurf
+cp .env.example .env   # optional: add Alpaca keys, IVSURF_API_KEY
+./scripts/compose-up.sh
+```
+
+Or manually:
+
+```bash
+docker compose up -d --build
+```
+
+| Service | URL | Description |
+|---------|-----|-------------|
+| `ui` | http://localhost:8501 | Streamlit terminal |
+| `api` | http://localhost:8000/health | FastAPI backend |
+
+Shared signal data persists in the `ivsurf_data` Docker volume at `/app/data`.
+
+Optional PostgreSQL backend:
+
+```bash
+./scripts/compose-up.sh --postgres
+# or
+docker compose -f docker-compose.yml -f docker-compose.postgres.yml up -d --build
+```
+
+Stop all services:
+
+```bash
+docker compose down
 ```
 
 ## Resources

@@ -1,0 +1,29 @@
+# Optional PostgreSQL backend for multi-instance API deployments.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.postgres.yml up -d
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ivsurf-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ivsurf}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ivsurf}
+      POSTGRES_DB: ${POSTGRES_DB:-ivsurf}
+    volumes:
+      - ivsurf_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ivsurf} -d ${POSTGRES_DB:-ivsurf}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  api:
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      IVSURF_DATABASE_URL: postgresql://${POSTGRES_USER:-ivsurf}:${POSTGRES_PASSWORD:-ivsurf}@postgres:5432/${POSTGRES_DB:-ivsurf}
+
+volumes:
+  ivsurf_pgdata:
