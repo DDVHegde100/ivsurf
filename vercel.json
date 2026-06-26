@@ -1,16 +1,22 @@
 {
-  "name": "ivsurf-volatility-explorer",
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "name": "openpulse",
   "version": 2,
   "builds": [
-    {
-      "src": "app.py",
-      "use": "@vercel/python"
-    }
+    { "src": "api/index.py", "use": "@vercel/python", "config": { "maxLambdaSize": "50mb" } }
   ],
   "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "app.py"
-    }
-  ]
+    { "src": "/api/(.*)", "dest": "api/index.py" },
+    { "src": "/health", "dest": "api/index.py" },
+    { "src": "/scan", "dest": "api/index.py" },
+    { "src": "/predict/(.*)", "dest": "api/index.py" },
+    { "src": "/signals/(.*)", "dest": "api/index.py" },
+    { "src": "/universes/(.*)", "dest": "api/index.py" },
+    { "src": "/spatial/(.*)", "dest": "api/index.py" },
+    { "src": "/(.*)", "dest": "/public/$1" }
+  ],
+  "env": {
+    "MPLBACKEND": "Agg",
+    "IVSURF_DB_PATH": "/tmp/ivsurf.db"
+  }
 }
