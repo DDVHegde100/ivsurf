@@ -1,13 +1,8 @@
 """
-IVSURF Volatility Explorer - Vercel Deployment Entry Point
+OpenPulse Vercel compatibility shim.
+
+Vercel routes API traffic to api/index.py (FastAPI).
+This file remains for legacy build configs that reference app.py.
 """
-import os
-import sys
 
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
-# Import the main terminal
-from scripts.ivsurf_retro_terminal import main
-
-if __name__ == "__main__":
-    main()
+from api.main import app
