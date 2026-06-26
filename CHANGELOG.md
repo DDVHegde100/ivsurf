@@ -2,6 +2,16 @@
 
 All notable changes to OpenPulse (formerly IVSURF) are documented here.
 
+## [1.3.0] - 2026-06-26
+
+### Added
+
+- Vercel deployment for OpenPulse API + static landing page
+- Heston IV, Greeks, regime graph, weight heatmap 3D visualizations
+- Vector field cones, correlation tubes, opening range 3D scatter
+- `/spatial/*` JSON API for external 3D clients
+- Spatial Lab ADVANCED tab
+
 ## [1.2.0] - 2026-06-24
 
 ### Added
@@ -49,6 +59,7 @@ First stable release of the opening-hours volatility scanner platform.
 
 - 141+ unit tests; CI on Python 3.9 and 3.11
 
+[1.3.0]: https://github.com/DDVHegde100/ivsurf/releases/tag/v1.3.0
 [1.2.0]: https://github.com/DDVHegde100/ivsurf/releases/tag/v1.2.0
 [1.1.0]: https://github.com/DDVHegde100/ivsurf/releases/tag/v1.1.0
 [1.0.0]: https://github.com/DDVHegde100/ivsurf/releases/tag/v1.0.0

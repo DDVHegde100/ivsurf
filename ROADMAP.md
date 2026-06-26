@@ -57,6 +57,13 @@
 - [x] Fourier spectral, price ribbon, Monte Carlo path cloud
 - [x] HTML export for 3D Plotly figures
 
+## v1.3 — Vercel & Quant 3D
+
+- [x] Vercel serverless OpenPulse API deployment
+- [x] Heston, Greeks, regime graph, weight heatmap 3D
+- [x] Vector field, correlation tubes, opening range 3D
+- [x] Spatial JSON API (`/spatial/*`)
+
 ## Non-Goals
 
 - Replacing Bloomberg or institutional OMS systems

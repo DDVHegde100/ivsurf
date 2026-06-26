@@ -16,7 +16,7 @@ from api.routes import opening_range_ws, predict, scan, signals, spatial, univer
 app = FastAPI(
     title=API_TITLE,
     description=PRODUCT_TAGLINE,
-    version="1.2.0",
+    version="1.3.0",
 )
 
 app.add_middleware(
