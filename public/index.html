@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OpenPulse — Opening Volatility Scanner</title>
+  <style>
+    :root { --bg: #0a0f0a; --fg: #00ff41; --muted: #66ff66; --accent: #ffd700; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Courier New", monospace;
+      background: linear-gradient(145deg, #0a0a0a, #1a1a1a);
+      color: var(--fg);
+      min-height: 100vh;
+      padding: 2rem;
+    }
+    .wrap { max-width: 900px; margin: 0 auto; }
+    h1 { font-size: 2rem; margin-bottom: 0.5rem; text-shadow: 0 0 12px rgba(0,255,65,0.4); }
+    .tag { color: var(--muted); margin-bottom: 2rem; line-height: 1.6; }
+    .grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+    .card {
+      border: 1px solid var(--fg);
+      border-radius: 8px;
+      padding: 1.25rem;
+      background: rgba(0, 20, 0, 0.5);
+    }
+    .card h2 { font-size: 1rem; color: var(--accent); margin-bottom: 0.75rem; }
+    .card a { color: var(--fg); text-decoration: none; display: block; margin: 0.35rem 0; }
+    .card a:hover { text-decoration: underline; }
+    code { background: #111; padding: 0.15rem 0.4rem; border-radius: 3px; }
+    footer { margin-top: 3rem; font-size: 0.8rem; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>⚡ OpenPulse</h1>
+    <p class="tag">
+      Opening-hours volatility scanner &amp; spatial research platform.<br />
+      API hosted on Vercel · Full terminal on Streamlit / Docker.
+    </p>
+    <div class="grid">
+      <div class="card">
+        <h2>API</h2>
+        <a href="/health">GET /health</a>
+        <a href="/universes">GET /universes</a>
+        <a href="/spatial/catalog">GET /spatial/catalog</a>
+      </div>
+      <div class="card">
+        <h2>Scan</h2>
+        <p style="font-size:0.85rem;color:var(--muted);margin-bottom:0.5rem;">POST JSON to <code>/scan</code></p>
+        <code>{"universe":"opening","min_score":20}</code>
+      </div>
+      <div class="card">
+        <h2>Full UI</h2>
+        <a href="https://ivsurf-volatility-explorer.streamlit.app" target="_blank">Streamlit Terminal</a>
+        <a href="https://github.com/DDVHegde100/ivsurf" target="_blank">GitHub</a>
+      </div>
+    </div>
+    <footer>© OpenPulse / IVSURF · Research use only · Not investment advice</footer>
+  </div>
+</body>
+</html>
