@@ -208,6 +208,34 @@ Stop all services:
 docker compose down
 ```
 
+## Vercel (OpenPulse API)
+
+Deploy the **FastAPI backend** and static landing page to Vercel:
+
+```bash
+npm i -g vercel   # or npx vercel
+vercel link       # first time only
+vercel --prod
+```
+
+Or push to `main` if the GitHub repo is connected to Vercel.
+
+| Route | Description |
+|-------|-------------|
+| `/` | OpenPulse landing page (`public/index.html`) |
+| `/health` | API health check |
+| `/scan` | Opening scanner (POST) |
+| `/spatial/catalog` | 3D spatial asset catalog |
+| `/spatial/heston` | Heston IV grid JSON |
+
+**Notes:**
+
+- Vercel uses `requirements-vercel.txt` (slim deps, no Streamlit).
+- Entry point: `api/index.py` exports the FastAPI ASGI app.
+- WebSocket `/ws/opening-range` is **not** supported on Vercel serverless.
+- Set env vars in the Vercel dashboard: `IVSURF_API_KEY`, `ALPACA_API_KEY`, etc.
+- Full Streamlit terminal remains on Streamlit Cloud or Docker.
+
 ## Resources
 
 - Streamlit Community Cloud: 1 GB RAM, shared CPU — sufficient for scanner workloads on small universes (<50 tickers).
