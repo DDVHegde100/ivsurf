@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.brand import API_TITLE, PRODUCT_NAME, PRODUCT_TAGLINE
 from api.auth import auth_enabled, require_api_key
-from api.routes import opening_range_ws, predict, scan, signals, universes
+from api.routes import opening_range_ws, predict, scan, signals, spatial, universes
 
 app = FastAPI(
     title=API_TITLE,
@@ -32,6 +32,7 @@ app.include_router(scan.router, prefix="/scan", tags=["scan"], dependencies=_pro
 app.include_router(predict.router, prefix="/predict", tags=["predict"], dependencies=_protected)
 app.include_router(signals.router, prefix="/signals", tags=["signals"], dependencies=_protected)
 app.include_router(universes.router, prefix="/universes", tags=["universes"], dependencies=_protected)
+app.include_router(spatial.router, prefix="/spatial", tags=["spatial"])
 app.include_router(opening_range_ws.router, prefix="/ws", tags=["websocket"])
 
 

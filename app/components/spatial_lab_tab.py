@@ -15,18 +15,26 @@ from engine.signals.regime_filter import RegimeFilter
 from engine.spatial.knowledge_graph import build_sector_map
 from visuals.plot_3d.animated import plot_animated_surface
 from visuals.plot_3d.correlation import plot_correlation_sphere
+from visuals.plot_3d.correlation_tubes import plot_correlation_tubes_3d
 from visuals.plot_3d.export import export_figure_html
+from visuals.plot_3d.greeks_surface import plot_greeks_surface_3d
+from visuals.plot_3d.heston import plot_heston_surface_3d
 from visuals.plot_3d.knowledge_graph import plot_knowledge_graph_3d
 from visuals.plot_3d.mc_paths import plot_mc_path_cloud_3d
 from visuals.plot_3d.ml_features import plot_ml_feature_space_3d
 from visuals.plot_3d.ml_landscape import plot_ml_loss_landscape_3d
 from visuals.plot_3d.nn_architecture import plot_nn_architecture_3d
 from visuals.plot_3d.opening_terrain import plot_opening_score_terrain
+from visuals.plot_3d.opening_range_3d import plot_opening_range_3d
 from visuals.plot_3d.options_smile import plot_vol_smile_3d
 from visuals.plot_3d.parametric import plot_parametric_surface
 from visuals.plot_3d.price_paths import plot_price_path_3d, synthetic_price_path
+from visuals.plot_3d.regime_graph import plot_regime_graph_3d
 from visuals.plot_3d.risk_ellipsoid import plot_risk_ellipsoid_3d
 from visuals.plot_3d.spectral import plot_spectral_surface_3d
+from visuals.plot_3d.training_history import plot_training_history_3d
+from visuals.plot_3d.vector_field import plot_vector_field_3d
+from visuals.plot_3d.weight_heatmap import plot_weight_heatmap_3d
 
 
 def render_spatial_lab_tab() -> None:
@@ -42,9 +50,9 @@ def render_spatial_lab_tab() -> None:
     )
 
     tabs = st.tabs(
-        ["MATH", "ML & NN", "MARKET", "RISK & OPTIONS", "PATHS & MC", "CALC", "EXPORT"]
+        ["MATH", "ML & NN", "MARKET", "RISK & OPTIONS", "PATHS & MC", "ADVANCED", "CALC", "EXPORT"]
     )
-    tab_math, tab_ml, tab_market, tab_risk, tab_paths, tab_calc, tab_export = tabs
+    tab_math, tab_ml, tab_market, tab_risk, tab_paths, tab_adv, tab_calc, tab_export = tabs
 
     with tab_math:
         _render_math_surfaces()
@@ -60,6 +68,9 @@ def render_spatial_lab_tab() -> None:
 
     with tab_paths:
         _render_paths_mc()
+
+    with tab_adv:
+        _render_advanced_3d()
 
     with tab_calc:
         _render_spatial_calculator()
@@ -97,6 +108,8 @@ def _render_ml_graphs() -> None:
             "Feature space PCA",
             "Neural network architecture",
             "Fourier spectral surface",
+            "Training history 3D",
+            "Weight heatmap 3D",
         ],
     )
 
@@ -112,6 +125,14 @@ def _render_ml_graphs() -> None:
 
     if ml_view == "Fourier spectral surface":
         _show_fig(plot_spectral_surface_3d(), "spectral")
+        return
+
+    if ml_view == "Training history 3D":
+        _show_fig(plot_training_history_3d(), "trainhist")
+        return
+
+    if ml_view == "Weight heatmap 3D":
+        _show_fig(plot_weight_heatmap_3d(), "weights")
         return
 
     tickers_raw = st.text_input("Tickers for feature PCA", value=", ".join(get_preset("opening")))
@@ -161,13 +182,21 @@ def _render_market_3d() -> None:
 
 def _render_risk_options() -> None:
     st.subheader("Risk & Options 3D")
-    view = st.radio("View", ["Risk ellipsoid", "IV smile surface"], horizontal=True)
+    view = st.selectbox(
+        "View",
+        ["Risk ellipsoid", "IV smile surface", "Heston surface", "Greeks surface"],
+    )
     if view == "Risk ellipsoid":
         st.caption("3D covariance ellipsoid — 95% risk region for a 3-asset portfolio.")
         _show_fig(plot_risk_ellipsoid_3d(), "ellipsoid")
-    else:
+    elif view == "IV smile surface":
         spot = st.number_input("Spot price", value=100.0, min_value=1.0)
         _show_fig(plot_vol_smile_3d(spot=spot), "smile")
+    elif view == "Heston surface":
+        _show_fig(plot_heston_surface_3d(), "heston")
+    else:
+        greek = st.selectbox("Greek", ["gamma", "delta", "vega"])
+        _show_fig(plot_greeks_surface_3d(greek), "greeks")
 
 
 def _render_paths_mc() -> None:
@@ -179,6 +208,27 @@ def _render_paths_mc() -> None:
     else:
         n_paths = st.slider("Paths", 10, 50, 25)
         _show_fig(plot_mc_path_cloud_3d(n_paths=n_paths), "mc")
+
+
+def _render_advanced_3d() -> None:
+    st.subheader("Advanced 3D Analytics")
+    view = st.selectbox(
+        "View",
+        ["Regime transition graph", "Vector field", "Correlation tubes", "Opening range 3D"],
+    )
+    if view == "Regime transition graph":
+        _show_fig(plot_regime_graph_3d(), "regime")
+    elif view == "Vector field":
+        _show_fig(plot_vector_field_3d(), "vfield")
+    elif view == "Correlation tubes":
+        _show_fig(plot_correlation_tubes_3d(), "ctubes")
+    else:
+        tickers = parse_ticker_list(st.text_input("Tickers", value="AAPL, NVDA, TSLA"))
+        if tickers and st.button("Load OR 3D"):
+            try:
+                _show_fig(plot_opening_range_3d(tickers), "or3d")
+            except Exception as exc:
+                st.error(str(exc))
 
 
 def _render_spatial_calculator() -> None:
